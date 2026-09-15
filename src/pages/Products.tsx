@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react'
-import { Plus, Search, Edit, Trash2, ShoppingCart, ShoppingBag, Package, ImageIcon, X } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, ShoppingCart, ShoppingBag, Package, ImageIcon, X, Ruler, Calendar, XCircle, Upload } from 'lucide-react'
 import { useProductStore } from '../stores/productStore'
 import { useCartStore } from '../stores/cartStore'
 import { formatCurrency, CATEGORIES } from '../lib/utils'
 import Modal from '../components/Modal'
+import ActionDropdown from '../components/ActionDropdown'
 import CartPanel from '../components/CartPanel'
 import DataTable from '../components/DataTable'
+import { productService } from '../services/productService'
 import type { Column } from '../components/DataTable/types'
 import type { Product, ProductSize } from '../types'
 
@@ -55,22 +57,6 @@ const columns: Column<Product>[] = [
       </span>
     ),
   },
-  {
-    key: 'sizes',
-    header: 'Tallas',
-    hideBelow: 'md',
-    render: (p) =>
-      p.sizes && p.sizes.length > 0 ? (
-        <div className="flex flex-wrap gap-1 max-w-[180px]">
-          {p.sizes.map((s, i) => (
-            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-md text-xs font-medium">
-              {s.size}
-              {s.stock !== undefined && s.stock !== null && <span className="text-indigo-400">{s.stock}</span>}
-            </span>
-          ))}
-        </div>
-      ) : null,
-  },
   { key: 'purchasePrice', header: 'P. Compra', align: 'right', hideBelow: 'xl', render: (p) => formatCurrency(p.purchasePrice) },
   { key: 'salePrice', header: 'P. Venta', align: 'right', render: (p) => formatCurrency(p.salePrice) },
   {
@@ -92,8 +78,8 @@ const columns: Column<Product>[] = [
 export default function Products() {
   const {
     products, meta, loading, error,
-    page, limit, search, categoryFilter,
-    fetchProducts, setPage, setLimit, setSearch, setCategoryFilter,
+    page, limit, search, categoryFilter, startDateFilter, endDateFilter,
+    fetchProducts, setPage, setLimit, setSearch, setCategoryFilter, setStartDateFilter, setEndDateFilter,
     addProduct, updateProduct, deleteProduct,
   } = useProductStore()
   const cartStore = useCartStore()
@@ -102,6 +88,10 @@ export default function Products() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [searchInput, setSearchInput] = useState(search)
+  const [sizesModalProduct, setSizesModalProduct] = useState<Product | null>(null)
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imagePreview, setImagePreview] = useState<string | null>(null)
+  const [sizeSelectorProduct, setSizeSelectorProduct] = useState<Product | null>(null)
 
   useEffect(() => {
     fetchProducts()
@@ -116,18 +106,24 @@ export default function Products() {
 
   const cartItemCount = cartStore.items.reduce((sum, i) => sum + i.quantity, 0)
 
-  const addToCart = (product: Product) => {
+  const addToCart = (product: Product, size?: string) => {
+    const sizeObj = size && product.sizes ? product.sizes.find((s) => s.size === size) : null
+    const maxStock = sizeObj ? (sizeObj.stock ?? 0) : product.stock
+    if (maxStock <= 0) return
     cartStore.addItem({
       productId: product.id,
       productName: product.name,
+      size,
       unitPrice: product.salePrice,
-      maxStock: product.stock,
+      maxStock,
     })
   }
 
   const openCreate = () => {
     setForm(emptyForm)
     setEditingId(null)
+    setImageFile(null)
+    setImagePreview(null)
     setIsModalOpen(true)
   }
 
@@ -146,6 +142,8 @@ export default function Products() {
       sizes: (product.sizes ?? []).map((s) => ({ size: s.size, stock: s.stock ?? 0 })),
     })
     setEditingId(product.id)
+    setImageFile(null)
+    setImagePreview(product.image ?? null)
     setIsModalOpen(true)
   }
 
@@ -161,29 +159,39 @@ export default function Products() {
         : null,
     }
     try {
+      let result: Product
       if (editingId) {
-        await updateProduct(editingId, payload)
+        result = await updateProduct(editingId, payload)
       } else {
-        await addProduct(payload)
+        result = await addProduct(payload)
+      }
+      if (imageFile) {
+        await productService.uploadImage(result.id, imageFile)
       }
       setIsModalOpen(false)
+      setImageFile(null)
+      setImagePreview(null)
     } catch {
       // error se maneja en el store
     }
   }
 
   const addSize = () => {
-    setForm({ ...form, sizes: [...form.sizes, { size: '', stock: 0 }] })
+    const newSizes = [...form.sizes, { size: '', stock: 0 }]
+    setForm({ ...form, sizes: newSizes, stock: newSizes.reduce((sum, s) => sum + (s.stock || 0), 0) })
   }
 
   const removeSize = (index: number) => {
-    setForm({ ...form, sizes: form.sizes.filter((_, i) => i !== index) })
+    const newSizes = form.sizes.filter((_, i) => i !== index)
+    setForm({ ...form, sizes: newSizes, stock: newSizes.reduce((sum, s) => sum + (s.stock || 0), 0) })
   }
 
   const updateSize = (index: number, field: keyof ProductSize, value: string | number) => {
+    const newSizes = form.sizes.map((s, i) => (i === index ? { ...s, [field]: value } : s))
     setForm({
       ...form,
-      sizes: form.sizes.map((s, i) => (i === index ? { ...s, [field]: value } : s)),
+      sizes: newSizes,
+      stock: newSizes.reduce((sum, s) => sum + (s.stock || 0), 0),
     })
   }
 
@@ -239,6 +247,39 @@ export default function Products() {
         </select>
       </div>
 
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-gray-400" />
+          <input
+            type="date"
+            value={startDateFilter}
+            onChange={(e) => setStartDateFilter(e.target.value)}
+            placeholder="Fecha inicio"
+            className="bg-white border-0 rounded-xl px-4 py-2.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm transition-all"
+          />
+          <span className="text-gray-400 text-sm">hasta</span>
+          <input
+            type="date"
+            value={endDateFilter}
+            onChange={(e) => setEndDateFilter(e.target.value)}
+            placeholder="Fecha fin"
+            className="bg-white border-0 rounded-xl px-4 py-2.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm transition-all"
+          />
+        </div>
+        {(startDateFilter || endDateFilter) && (
+          <button
+            onClick={() => {
+              setStartDateFilter('')
+              setEndDateFilter('')
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+          >
+            <XCircle className="w-4 h-4" />
+            Limpiar fechas
+          </button>
+        )}
+      </div>
+
       {error && (
         <div className="p-4 bg-red-50 border border-red-100 text-red-600 rounded-2xl text-sm font-medium">{error}</div>
       )}
@@ -262,25 +303,39 @@ export default function Products() {
           <div className="flex justify-end gap-1">
             {p.stock > 0 && (
               <button
-                onClick={() => addToCart(p)}
+                onClick={() => {
+                  if (p.sizes && p.sizes.length > 0) {
+                    setSizeSelectorProduct(p)
+                  } else {
+                    addToCart(p)
+                  }
+                }}
                 title="Agregar al carrito"
                 className="p-2 rounded-xl hover:bg-violet-50 text-violet-500 transition-colors"
               >
                 <ShoppingCart className="w-4 h-4" />
               </button>
             )}
-            <button
-              onClick={() => openEdit(p)}
-              className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
-            >
-              <Edit className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => deleteProduct(p.id)}
-              className="p-2 rounded-xl hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-            </button>
+            <ActionDropdown
+              actions={[
+                {
+                  label: 'Ver tallas',
+                  icon: <Ruler className="w-4 h-4" />,
+                  onClick: () => setSizesModalProduct(p),
+                },
+                {
+                  label: 'Editar',
+                  icon: <Edit className="w-4 h-4" />,
+                  onClick: () => openEdit(p),
+                },
+                {
+                  label: 'Eliminar',
+                  icon: <Trash2 className="w-4 h-4" />,
+                  onClick: () => deleteProduct(p.id),
+                  className: 'text-red-600 hover:bg-red-50',
+                },
+              ]}
+            />
           </div>
         )}
       />
@@ -342,28 +397,87 @@ export default function Products() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Imagen (URL)</label>
-            <div className="flex items-start gap-3">
-              {form.image.trim() ? (
-                <img
-                  src={form.image}
-                  alt="Preview"
-                  className="w-16 h-16 rounded-xl object-cover border border-gray-200 shrink-0"
-                  onError={(e) => { (e.target as HTMLImageElement).style.opacity = '0.2' }}
-                  onLoad={(e) => { (e.target as HTMLImageElement).style.opacity = '1' }}
-                />
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Imagen</label>
+            <div
+              onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
+              onDragLeave={(e) => { e.preventDefault(); e.stopPropagation() }}
+              onDrop={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                const file = e.dataTransfer.files?.[0]
+                if (file && file.type.startsWith('image/')) {
+                  setImageFile(file)
+                  setImagePreview(URL.createObjectURL(file))
+                }
+              }}
+              className={`relative flex flex-col items-center justify-center w-full min-h-[180px] rounded-2xl border-2 border-dashed transition-all cursor-pointer
+                ${imagePreview
+                  ? 'border-violet-300 bg-violet-50/30'
+                  : 'border-gray-200 bg-gray-50 hover:border-violet-300 hover:bg-violet-50/30'
+                }`}
+            >
+              {imagePreview ? (
+                <>
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    className="w-full h-40 rounded-xl object-contain"
+                  />
+                  <div className="flex items-center gap-3 mt-3">
+                    <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-600 bg-violet-100 rounded-lg hover:bg-violet-200 transition-colors cursor-pointer">
+                      <Upload className="w-3.5 h-3.5" />
+                      Cambiar
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0]
+                          if (file) {
+                            setImageFile(file)
+                            setImagePreview(URL.createObjectURL(file))
+                          }
+                        }}
+                        className="hidden"
+                      />
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setImageFile(null)
+                        setImagePreview(editingId ? form.image : null)
+                        setForm({ ...form, image: '' })
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-100 rounded-lg hover:bg-red-200 transition-colors"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                      Eliminar
+                    </button>
+                  </div>
+                </>
               ) : (
-                <div className="w-16 h-16 rounded-xl bg-gray-50 border border-dashed border-gray-200 flex items-center justify-center shrink-0">
-                  <ImageIcon className="w-5 h-5 text-gray-300" />
-                </div>
+                <label className="flex flex-col items-center gap-2 w-full h-full p-6 cursor-pointer">
+                  <div className="w-12 h-12 rounded-full bg-violet-100 flex items-center justify-center">
+                    <Upload className="w-5 h-5 text-violet-500" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-medium text-gray-700">Arrastra una imagen aquí</p>
+                    <p className="text-xs text-gray-400 mt-0.5">o haz clic para seleccionar</p>
+                  </div>
+                  <p className="text-xs text-gray-400">JPG, PNG, WebP o GIF. Max 5MB.</p>
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) {
+                        setImageFile(file)
+                        setImagePreview(URL.createObjectURL(file))
+                      }
+                    }}
+                    className="hidden"
+                  />
+                </label>
               )}
-              <input
-                type="url"
-                placeholder="https://ejemplo.com/imagen.jpg"
-                value={form.image}
-                onChange={(e) => setForm({ ...form, image: e.target.value })}
-                className="flex-1 w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all"
-              />
             </div>
           </div>
           <div>
@@ -442,13 +556,16 @@ export default function Products() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Stock</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                Stock {form.sizes.length > 0 && <span className="text-xs text-gray-400 font-normal">(auto desde tallas)</span>}
+              </label>
               <input
                 type="number"
                 min={0}
                 value={form.stock}
-                onChange={(e) => setForm({ ...form, stock: Number(e.target.value) })}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all"
+                readOnly={form.sizes.length > 0}
+                onChange={(e) => { if (form.sizes.length === 0) setForm({ ...form, stock: Number(e.target.value) }) }}
+                className={`w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all ${form.sizes.length > 0 ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
               />
             </div>
           </div>
@@ -468,6 +585,83 @@ export default function Products() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        isOpen={!!sizesModalProduct}
+        onClose={() => setSizesModalProduct(null)}
+        title={`Tallas - ${sizesModalProduct?.name ?? ''}`}
+        size="md"
+      >
+        {sizesModalProduct?.sizes && sizesModalProduct.sizes.length > 0 ? (
+          <div className="space-y-3">
+            {sizesModalProduct.sizes.map((s, i) => (
+              <div
+                key={i}
+                className="flex items-center justify-between p-3 bg-gray-50 rounded-xl"
+              >
+                <span className="font-medium text-gray-900">{s.size}</span>
+                <span
+                  className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                    (s.stock ?? 0) === 0
+                      ? 'bg-red-50 text-red-600'
+                      : (s.stock ?? 0) < 10
+                        ? 'bg-amber-50 text-amber-600'
+                        : 'bg-emerald-50 text-emerald-600'
+                  }`}
+                >
+                  Stock: {s.stock ?? 0}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500 text-center py-4">Este producto no tiene tallas configuradas.</p>
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={!!sizeSelectorProduct}
+        onClose={() => setSizeSelectorProduct(null)}
+        title={`Seleccionar talla - ${sizeSelectorProduct?.name ?? ''}`}
+        size="md"
+      >
+        {sizeSelectorProduct?.sizes && sizeSelectorProduct.sizes.length > 0 ? (
+          <div className="space-y-2">
+            {sizeSelectorProduct.sizes.map((s, i) => (
+              <button
+                key={i}
+                onClick={() => {
+                  if (sizeSelectorProduct && s.stock && s.stock > 0) {
+                    addToCart(sizeSelectorProduct, s.size)
+                    setSizeSelectorProduct(null)
+                  }
+                }}
+                disabled={!s.stock || s.stock <= 0}
+                className={`w-full flex items-center justify-between p-3 rounded-xl border transition-colors ${
+                  s.stock && s.stock > 0
+                    ? 'border-gray-200 hover:border-violet-300 hover:bg-violet-50 cursor-pointer'
+                    : 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
+                }`}
+              >
+                <span className="font-medium text-gray-900">{s.size}</span>
+                <span
+                  className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                    (s.stock ?? 0) === 0
+                      ? 'bg-red-50 text-red-600'
+                      : (s.stock ?? 0) < 10
+                        ? 'bg-amber-50 text-amber-600'
+                        : 'bg-emerald-50 text-emerald-600'
+                  }`}
+                >
+                  Stock: {s.stock ?? 0}
+                </span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-gray-500 text-center py-4">Este producto no tiene tallas configuradas.</p>
+        )}
       </Modal>
 
       <CartPanel isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />

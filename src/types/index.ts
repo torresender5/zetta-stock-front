@@ -15,6 +15,8 @@ export interface ProductQueryParams {
   limit?: number
   search?: string
   category?: string
+  startDate?: string
+  endDate?: string
 }
 
 export interface ProductSize {
@@ -80,6 +82,7 @@ export interface Purchase {
 export interface SaleItem {
   productId: string
   productName: string
+  size?: string
   quantity: number
   unitPrice: number
   subtotal: number

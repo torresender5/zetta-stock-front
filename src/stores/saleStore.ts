@@ -48,7 +48,7 @@ export const useSaleStore = create<SaleStore>()((set) => ({
       // Reducir stock local
       const { updateStock } = useProductStore.getState()
       for (const item of items) {
-        await updateStock(item.productId, -item.quantity)
+        await updateStock(item.productId, -item.quantity, item.size)
       }
       set((state) => ({
         sales: [...state.sales, sale],

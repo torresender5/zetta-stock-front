@@ -24,6 +24,15 @@ export const productService = {
     return data
   },
 
+  uploadImage: async (id: string, file: File): Promise<Product> => {
+    const formData = new FormData()
+    formData.append('image', file)
+    const { data } = await api.patch<Product>(`/products/${id}/image`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data
+  },
+
   delete: async (id: string): Promise<void> => {
     await api.delete(`/products/${id}`)
   },

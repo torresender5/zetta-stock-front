@@ -13,16 +13,20 @@ interface ProductStore {
   limit: number
   search: string
   categoryFilter: string
+  startDateFilter: string
+  endDateFilter: string
   fetchProducts: () => Promise<void>
   fetchAllProducts: () => Promise<void>
   setPage: (page: number) => void
   setLimit: (limit: number) => void
   setSearch: (search: string) => void
   setCategoryFilter: (category: string) => void
-  addProduct: (product: CreateProductDto) => Promise<void>
-  updateProduct: (id: string, product: Partial<Product>) => Promise<void>
+  setStartDateFilter: (date: string) => void
+  setEndDateFilter: (date: string) => void
+  addProduct: (product: CreateProductDto) => Promise<Product>
+  updateProduct: (id: string, product: Partial<Product>) => Promise<Product>
   deleteProduct: (id: string) => Promise<void>
-  updateStock: (id: string, quantity: number) => Promise<void>
+  updateStock: (id: string, quantity: number, size?: string) => Promise<void>
 }
 
 export const useProductStore = create<ProductStore>()((set, get) => ({
@@ -34,9 +38,11 @@ export const useProductStore = create<ProductStore>()((set, get) => ({
   limit: 10,
   search: '',
   categoryFilter: '',
+  startDateFilter: '',
+  endDateFilter: '',
 
   fetchProducts: async () => {
-    const { page, limit, search, categoryFilter } = get()
+    const { page, limit, search, categoryFilter, startDateFilter, endDateFilter } = get()
     set({ loading: true, error: null })
     try {
       const { data, meta } = await productService.getAll({
@@ -44,6 +50,8 @@ export const useProductStore = create<ProductStore>()((set, get) => ({
         limit,
         search: search || undefined,
         category: categoryFilter || undefined,
+        startDate: startDateFilter || undefined,
+        endDate: endDateFilter || undefined,
       })
       set({ products: data, meta, loading: false })
     } catch {
@@ -86,12 +94,23 @@ export const useProductStore = create<ProductStore>()((set, get) => ({
     get().fetchProducts()
   },
 
+  setStartDateFilter: (startDateFilter) => {
+    set({ startDateFilter, page: 1 })
+    get().fetchProducts()
+  },
+
+  setEndDateFilter: (endDateFilter) => {
+    set({ endDateFilter, page: 1 })
+    get().fetchProducts()
+  },
+
   addProduct: async (product) => {
     set({ loading: true, error: null })
     try {
-      await productService.create(product)
+      const created = await productService.create(product)
       set({ loading: false })
       await get().fetchProducts()
+      return created
     } catch (error) {
       set({ error: 'Error al crear producto', loading: false })
       throw error
@@ -101,9 +120,10 @@ export const useProductStore = create<ProductStore>()((set, get) => ({
   updateProduct: async (id, updates) => {
     set({ loading: true, error: null })
     try {
-      await productService.update(id, updates)
+      const updated = await productService.update(id, updates)
       set({ loading: false })
       await get().fetchProducts()
+      return updated
     } catch (error) {
       set({ error: 'Error al actualizar producto', loading: false })
       throw error
@@ -122,12 +142,24 @@ export const useProductStore = create<ProductStore>()((set, get) => ({
     }
   },
 
-  updateStock: async (id, quantity) => {
+  updateStock: async (id, quantity, size) => {
     set({ loading: true, error: null })
     try {
       const product = get().products.find((p) => p.id === id)
       if (!product) throw new Error('Producto no encontrado')
-      await productService.update(id, { stock: product.stock + quantity })
+
+      let newSizes = product.sizes
+      if (size && product.sizes) {
+        newSizes = product.sizes.map((s) =>
+          s.size === size ? { ...s, stock: Math.max(0, (s.stock ?? 0) + quantity) } : s
+        )
+      }
+
+      const newStock = size
+        ? (newSizes ?? []).reduce((sum, s) => sum + (s.stock ?? 0), 0)
+        : product.stock + quantity
+
+      await productService.update(id, { stock: newStock, sizes: newSizes })
       set({ loading: false })
       await get().fetchProducts()
     } catch (error) {

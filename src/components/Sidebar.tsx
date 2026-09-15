@@ -48,26 +48,27 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
     <>
       {isOpen && (
         <div
-          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden transition-opacity"
+          className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40 lg:hidden transition-opacity ease-out duration-200"
           onClick={onClose}
         />
       )}
 
       <aside
-        className={`no-print fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950 text-white flex flex-col transition-transform duration-300 ease-out lg:static lg:translate-x-0 ${
+        className={`no-print fixed inset-y-0 left-0 z-50 w-64 shrink-0 bg-gradient-to-b from-gray-900 via-gray-900 to-gray-950 text-white flex flex-col transition-transform ease-out duration-300 lg:static lg:translate-x-0 ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="p-5 flex items-center justify-between">
           <h1 className="text-lg font-bold flex items-center gap-2.5">
-            <div className="bg-gradient-to-br from-violet-500 to-indigo-600 p-2 rounded-xl">
+            <div className="bg-gradient-to-br from-violet-500 to-indigo-600 p-2 rounded-xl shadow-lg shadow-violet-500/25">
               <Package className="w-4 h-4 text-white" />
             </div>
             GestiónPro
           </h1>
           <button
             onClick={onClose}
-            className="lg:hidden p-1.5 rounded-lg hover:bg-white/10 transition-colors"
+            aria-label="Cerrar menú"
+            className="lg:hidden p-1.5 rounded-lg hover:bg-white/10 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
           >
             <X className="w-4 h-4" />
           </button>
@@ -83,7 +84,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 end={to === '/'}
                 onClick={onClose}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                  `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400 ${
                     isActive
                       ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25'
                       : 'text-gray-400 hover:bg-white/5 hover:text-white'
@@ -110,7 +111,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
           </div>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-400 hover:bg-white/10 hover:text-white rounded-xl transition-colors"
+            className="flex items-center gap-2 w-full px-3 py-2 text-sm text-gray-400 hover:bg-white/10 hover:text-white rounded-xl transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400"
           >
             <LogOut className="w-4 h-4" />
             Cerrar sesión
