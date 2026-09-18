@@ -4,6 +4,7 @@ import { useCartStore } from '../stores/cartStore'
 import { useClientStore } from '../stores/clientStore'
 import { useSaleStore } from '../stores/saleStore'
 import { formatCurrency, TAX_RATE } from '../lib/utils'
+import { ClientSelect } from './ClientSelect'
 import { useNavigate } from 'react-router-dom'
 
 interface CartPanelProps {
@@ -151,18 +152,10 @@ export default function CartPanel({ isOpen, onClose }: CartPanelProps) {
                 <label htmlFor="cart-client" className="block text-sm font-medium text-foreground mb-1.5">
                   Cliente *
                 </label>
-                <select
-                  id="cart-client"
+                <ClientSelect
                   value={clientId}
-                  onChange={(e) => setClientId(e.target.value)}
-                  required
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-card focus:border-primary focus:ring-2 focus:ring-ring/30 outline-none transition-all cursor-pointer"
-                >
-                  <option value="">Seleccionar cliente...</option>
-                  {clients.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name} - {c.document}</option>
-                  ))}
-                </select>
+                  onChange={setClientId}
+                />
               </div>
 
               <fieldset>

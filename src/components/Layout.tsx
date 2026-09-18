@@ -18,7 +18,7 @@ export default function Layout() {
           >
             <Menu className="w-5 h-5 text-foreground" />
           </button>
-          <span className="font-semibold text-lg text-foreground">GestiónPro</span>
+          <img src="/logo.png" alt="zettastock" className="h-7 w-auto object-contain" />
         </header>
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
           <Outlet />

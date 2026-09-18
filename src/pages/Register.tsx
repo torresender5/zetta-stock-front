@@ -1,16 +1,22 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Package, UserPlus, Loader2 } from 'lucide-react'
+import { UserPlus, Loader2, User, Building2 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
+import type { RegisterDto } from '../services/authService'
 
 export default function Register() {
   const register = useAuthStore((s) => s.register)
   const loading = useAuthStore((s) => s.loading)
   const navigate = useNavigate()
+  const [accountType, setAccountType] = useState<'PERSONA' | 'EMPRESA'>('PERSONA')
   const [name, setName] = useState('')
+  const [companyName, setCompanyName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [document, setDocument] = useState('')
+  const [phoneNumber, setPhoneNumber] = useState('')
+  const [address, setAddress] = useState('')
   const [error, setError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,7 +32,18 @@ export default function Register() {
       return
     }
 
-    const result = await register(name, email, password)
+    const payload: RegisterDto = {
+      user: name,
+      email,
+      password,
+      accountType,
+      document: document || undefined,
+      phoneNumber: phoneNumber || undefined,
+      address: address || undefined,
+      companyName: accountType === 'EMPRESA' ? companyName || undefined : undefined,
+    }
+
+    const result = await register(payload)
     if (result.ok) {
       navigate('/')
     } else {
@@ -43,10 +60,9 @@ export default function Register() {
 
       <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-2xl mb-4 shadow-lg shadow-violet-500/25">
-            <Package className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center bg-white rounded-2xl px-8 py-4 mb-4 shadow-lg shadow-violet-500/25">
+            <img src="/logo.png" alt="zettastock" className="h-16 w-auto object-contain" />
           </div>
-          <h1 className="text-3xl font-bold text-white">GestiónPro</h1>
           <p className="text-gray-400 mt-2">Crea tu cuenta</p>
         </div>
 
@@ -60,14 +76,57 @@ export default function Register() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setAccountType('PERSONA')}
+                className={`flex flex-col items-center gap-2 rounded-2xl px-4 py-3 border transition-all ${
+                  accountType === 'PERSONA'
+                    ? 'bg-violet-500/20 border-violet-500/50 text-white'
+                    : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                }`}
+              >
+                <User className="w-5 h-5" />
+                <span className="text-sm font-medium">Persona</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAccountType('EMPRESA')}
+                className={`flex flex-col items-center gap-2 rounded-2xl px-4 py-3 border transition-all ${
+                  accountType === 'EMPRESA'
+                    ? 'bg-violet-500/20 border-violet-500/50 text-white'
+                    : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'
+                }`}
+              >
+                <Building2 className="w-5 h-5" />
+                <span className="text-sm font-medium">Empresa</span>
+              </button>
+            </div>
+
+            {accountType === 'EMPRESA' && (
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Razón social</label>
+                <input
+                  required
+                  type="text"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Mi Empresa SAS"
+                  className="w-full bg-white/5 border border-white/10 text-white rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
+                />
+              </div>
+            )}
+
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Nombre completo</label>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                {accountType === 'EMPRESA' ? 'Nombre del encargado' : 'Nombre completo'}
+              </label>
               <input
                 required
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Juan Pérez"
+                placeholder={accountType === 'EMPRESA' ? 'Juan Pérez' : 'Juan Pérez'}
                 className="w-full bg-white/5 border border-white/10 text-white rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
               />
             </div>
@@ -79,6 +138,38 @@ export default function Register() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="correo@ejemplo.com"
+                className="w-full bg-white/5 border border-white/10 text-white rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Documento / NIT</label>
+                <input
+                  type="text"
+                  value={document}
+                  onChange={(e) => setDocument(e.target.value)}
+                  placeholder={accountType === 'EMPRESA' ? 'NIT 900123456' : 'Cédula 1020...'}
+                  className="w-full bg-white/5 border border-white/10 text-white rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Teléfono</label>
+                <input
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="300 123 4567"
+                  className="w-full bg-white/5 border border-white/10 text-white rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">Dirección</label>
+              <input
+                type="text"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Calle 123 #45-67"
                 className="w-full bg-white/5 border border-white/10 text-white rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
               />
             </div>

@@ -1,4 +1,4 @@
-# Gestión de Productos
+# zettastock
 
 Sistema de gestión empresarial (facturación e inventario) para pequeños negocios. Permite administrar productos, clientes, proveedores, compras, ventas, facturación y cuentas por pagar/cobrar desde una interfaz web.
 
@@ -74,7 +74,7 @@ Desarrollado con **React 19**, **TypeScript 5** y **Vite 7**.
 
 ```bash
 git clone <url-del-repositorio>
-cd gestion-productos
+cd zetta-stock-front
 ```
 
 ### 2. Instalar dependencias

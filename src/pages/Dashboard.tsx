@@ -9,6 +9,9 @@ import { useProductStore } from '../stores/productStore'
 import { useClientStore } from '../stores/clientStore'
 import { usePurchaseStore } from '../stores/purchaseStore'
 import { useSaleStore } from '../stores/saleStore'
+import { useAuthStore } from '../stores/authStore'
+import { canReadModule } from '../lib/permissions'
+import type { ModuleKey } from '../lib/permissions'
 import { formatCurrency } from '../lib/utils'
 import type { Sale } from '../types'
 
@@ -78,7 +81,17 @@ const kpiConfig = [
   { key: 'lowStock', label: 'Stock Bajo', icon: DollarSign, color: 'text-accent', bgLight: 'bg-accent/10' },
 ] as const
 
+const kpiModule: Record<(typeof kpiConfig)[number]['key'], ModuleKey> = {
+  products: 'products',
+  clients: 'clients',
+  purchases: 'purchases',
+  sales: 'sales',
+  invoices: 'invoices',
+  lowStock: 'products',
+}
+
 export default function Dashboard() {
+  const role = useAuthStore((s) => s.user?.role)
   const { products, fetchAllProducts } = useProductStore()
   const { clients, fetchClients } = useClientStore()
   const { purchases, fetchPurchases } = usePurchaseStore()
@@ -86,17 +99,20 @@ export default function Dashboard() {
   const [period, setPeriod] = useState<Period>('day')
 
   useEffect(() => {
-    fetchAllProducts()
-    fetchClients()
-    fetchPurchases()
-    fetchSales()
-    fetchInvoices()
-  }, [])
+    if (canReadModule(role, 'products')) fetchAllProducts()
+    if (canReadModule(role, 'clients')) fetchClients()
+    if (canReadModule(role, 'purchases')) fetchPurchases()
+    if (canReadModule(role, 'sales')) fetchSales()
+    if (canReadModule(role, 'invoices')) fetchInvoices()
+  }, [role])
 
   const totalPurchases = purchases.reduce((sum, p) => sum + p.total, 0)
   const totalSales = sales.reduce((sum, s) => sum + s.total, 0)
   const pendingInvoices = invoices.filter((i) => i.status === 'pending').length
   const lowStock = products.filter((p) => p.stock < 10).length
+
+  const hasSales = canReadModule(role, 'sales')
+  const hasPurchases = canReadModule(role, 'purchases')
 
   const chartData = useMemo(() => groupSalesByPeriod(sales, period), [sales, period])
 
@@ -172,7 +188,9 @@ export default function Dashboard() {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {kpiConfig.map(({ key, label, icon: Icon, color, bgLight }) => (
+        {kpiConfig
+          .filter(({ key }) => canReadModule(role, kpiModule[key]))
+          .map(({ key, label, icon: Icon, color, bgLight }) => (
           <div
             key={key}
             className="group relative bg-card rounded-2xl p-5 shadow-sm border border-border transition-all duration-200 hover:shadow-md hover:border-primary/30 overflow-hidden"
@@ -191,6 +209,7 @@ export default function Dashboard() {
       </div>
 
       {/* Charts */}
+      {hasSales && (
       <div className="bg-card rounded-2xl p-6 shadow-sm border border-border">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
           <div>
@@ -259,8 +278,10 @@ export default function Dashboard() {
           </div>
         )}
       </div>
+      )}
 
       {/* Top Products & Top Clients */}
+      {hasSales && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Top Products Sold */}
         <div className="bg-card rounded-2xl p-6 shadow-sm border border-border">
@@ -408,10 +429,12 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+      )}
 
       {/* Cuentas por Pagar y Cobrar */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
         {/* Cuentas por Pagar */}
+        {hasPurchases && (
         <div className="bg-card rounded-2xl p-6 shadow-sm border border-border">
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-3">
@@ -455,8 +478,10 @@ export default function Dashboard() {
             </>
           )}
         </div>
+        )}
 
         {/* Cuentas por Cobrar */}
+        {hasSales && (
         <div className="bg-card rounded-2xl p-6 shadow-sm border border-border">
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-3">
@@ -500,6 +525,7 @@ export default function Dashboard() {
             </>
           )}
         </div>
+        )}
       </div>
 
       {/* Stock Bajo */}

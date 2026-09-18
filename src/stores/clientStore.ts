@@ -7,7 +7,7 @@ interface ClientStore {
   loading: boolean
   error: string | null
   fetchClients: () => Promise<void>
-  addClient: (client: CreateClientDto) => Promise<void>
+  addClient: (client: CreateClientDto) => Promise<Client>
   updateClient: (id: string, client: Partial<Client>) => Promise<void>
   deleteClient: (id: string) => Promise<void>
 }
@@ -32,6 +32,7 @@ export const useClientStore = create<ClientStore>()((set) => ({
     try {
       const newClient = await clientService.create(client)
       set((state) => ({ clients: [...state.clients, newClient], loading: false }))
+      return newClient
     } catch (error) {
       set({ error: 'Error al crear cliente', loading: false })
       throw error

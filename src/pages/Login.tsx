@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Package, LogIn, Loader2 } from 'lucide-react'
+import { LogIn, Loader2 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 
 export default function Login() {
@@ -23,51 +23,48 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-violet-950 to-gray-900 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-violet-300 via-violet-200 to-indigo-300 flex items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-violet-500/10 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl" />
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-violet-300/30 rounded-full blur-3xl" />
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-indigo-300/30 rounded-full blur-3xl" />
       </div>
 
       <div className="w-full max-w-md relative z-10">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-violet-500 to-indigo-600 rounded-2xl mb-4 shadow-lg shadow-violet-500/25">
-            <Package className="w-8 h-8 text-white" />
-          </div>
-          <h1 className="text-3xl font-bold text-white">GestiónPro</h1>
-          <p className="text-gray-400 mt-2">Gestión integral de productos</p>
+          <img src="/logo-login.png" alt="zettastock" className="w-72 h-auto object-contain mx-auto" />
+          <p className="text-gray-500 mt-2">Gestión integral de productos</p>
         </div>
 
-        <div className="bg-white/[0.07] backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-white/10">
-          <h2 className="text-xl font-semibold text-white mb-6">Iniciar Sesión</h2>
+        <div className="bg-white/80 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-violet-200">
+          <h2 className="text-xl font-semibold text-foreground mb-6">Iniciar Sesión</h2>
 
           {error && (
-            <div className="bg-red-500/10 border border-red-500/20 text-red-300 text-sm rounded-2xl p-4 mb-5">
+            <div className="bg-red-50 border border-red-200 text-red-600 text-sm rounded-2xl p-4 mb-5">
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
               <input
                 required
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="correo@ejemplo.com"
-                className="w-full bg-white/5 border border-white/10 text-white rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
+                className="w-full bg-white border border-gray-200 text-foreground rounded-xl px-4 py-3 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">Contraseña</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Contraseña</label>
               <input
                 required
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full bg-white/5 border border-white/10 text-white rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
+                className="w-full bg-white border border-gray-200 text-foreground rounded-xl px-4 py-3 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
               />
             </div>
             <button
@@ -80,9 +77,9 @@ export default function Login() {
             </button>
           </form>
 
-          <p className="text-center text-sm text-gray-400 mt-6">
+          <p className="text-center text-sm text-gray-500 mt-6">
             ¿No tienes cuenta?{' '}
-            <Link to="/register" className="text-violet-400 hover:text-violet-300 font-medium transition-colors">
+            <Link to="/register" className="text-violet-600 hover:text-violet-700 font-medium transition-colors">
               Regístrate aquí
             </Link>
           </p>

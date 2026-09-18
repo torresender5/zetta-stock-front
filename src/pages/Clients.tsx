@@ -2,15 +2,13 @@ import { useState, useEffect } from 'react'
 import { Plus, Search, Edit, Trash2, Loader2 } from 'lucide-react'
 import { useClientStore } from '../stores/clientStore'
 import Modal from '../components/Modal'
+import { ClientForm } from '../components/ClientForm'
 import type { Client } from '../types'
-
-const emptyForm = { name: '', email: '', phone: '', address: '', document: '' }
 
 export default function Clients() {
   const { clients, loading, error, fetchClients, addClient, updateClient, deleteClient } = useClientStore()
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState(emptyForm)
+  const [editingClient, setEditingClient] = useState<Client | null>(null)
   const [search, setSearch] = useState('')
 
   useEffect(() => {
@@ -22,18 +20,16 @@ export default function Clients() {
     c.document.toLowerCase().includes(search.toLowerCase())
   )
 
-  const openCreate = () => { setForm(emptyForm); setEditingId(null); setIsModalOpen(true) }
+  const openCreate = () => { setEditingClient(null); setIsModalOpen(true) }
 
   const openEdit = (client: Client) => {
-    setForm({ name: client.name, email: client.email, phone: client.phone, address: client.address, document: client.document })
-    setEditingId(client.id)
+    setEditingClient(client)
     setIsModalOpen(true)
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSubmit = async (form: { name: string; document: string; email: string; phone: string; address: string }) => {
     try {
-      if (editingId) { await updateClient(editingId, form) } else { await addClient(form) }
+      if (editingClient) { await updateClient(editingClient.id, form) } else { await addClient(form) }
       setIsModalOpen(false)
     } catch {
       // error se maneja en el store
@@ -105,42 +101,13 @@ export default function Clients() {
       </div>
       )}
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? 'Editar Cliente' : 'Nuevo Cliente'}>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Nombre *</label>
-              <input required type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all focus:outline-none" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">NIT / Cédula *</label>
-              <input required type="text" value={form.document} onChange={(e) => setForm({ ...form, document: e.target.value })}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all focus:outline-none" />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
-              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all focus:outline-none" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Teléfono</label>
-              <input type="text" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all focus:outline-none" />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Dirección</label>
-            <input type="text" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all focus:outline-none" />
-          </div>
-          <div className="flex justify-end gap-3 pt-4">
-            <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors text-sm font-medium">Cancelar</button>
-            <button type="submit" className="px-4 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium">{editingId ? 'Actualizar' : 'Crear'}</button>
-          </div>
-        </form>
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingClient ? 'Editar Cliente' : 'Nuevo Cliente'}>
+        <ClientForm
+          initial={editingClient ?? undefined}
+          submitLabel={editingClient ? 'Actualizar' : 'Crear'}
+          onCancel={() => setIsModalOpen(false)}
+          onSubmit={handleSubmit}
+        />
       </Modal>
     </div>
   )

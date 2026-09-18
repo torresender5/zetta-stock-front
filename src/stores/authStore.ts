@@ -1,7 +1,16 @@
 import { create } from 'zustand'
-import { authService, type AuthUser } from '../services/authService'
+import {
+  authService,
+  type AuthUser,
+  type RegisterDto,
+  type CreateUserDto,
+  type UpdateProfileDto,
+  type UpdateCompanyDto,
+} from '../services/authService'
+import type { Role } from '../lib/permissions'
 
-export type Role = 'admin' | 'user'
+export type { Role }
+export type { CreateUserDto }
 
 export type User = AuthUser
 
@@ -13,11 +22,14 @@ interface AuthStore {
   hydrated: boolean
   hydrate: () => Promise<void>
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>
-  register: (name: string, email: string, password: string) => Promise<{ ok: boolean; error?: string }>
+  register: (dto: RegisterDto) => Promise<{ ok: boolean; error?: string }>
   logout: () => void
   fetchUsers: () => Promise<void>
+  createUser: (dto: CreateUserDto) => Promise<{ ok: boolean; error?: string }>
   updateUser: (id: string, updates: { name?: string; email?: string; role?: Role; password?: string }) => Promise<{ ok: boolean; error?: string }>
   deleteUser: (id: string) => Promise<{ ok: boolean; error?: string }>
+  updateProfile: (dto: UpdateProfileDto) => Promise<{ ok: boolean; error?: string }>
+  updateCompany: (dto: UpdateCompanyDto) => Promise<{ ok: boolean; error?: string }>
 }
 
 export const useAuthStore = create<AuthStore>()((set, get) => ({
@@ -49,10 +61,10 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
     }
   },
 
-  register: async (name, email, password) => {
+  register: async (dto: RegisterDto) => {
     set({ loading: true, error: null })
     try {
-      const { user } = await authService.register({ user: name, email, password })
+      const { user } = await authService.register(dto)
       set({ user, loading: false })
       return { ok: true }
     } catch (err: any) {
@@ -74,6 +86,22 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
       set({ users, loading: false })
     } catch {
       set({ error: 'Error al cargar usuarios', loading: false })
+    }
+  },
+
+  createUser: async (dto: CreateUserDto) => {
+    set({ loading: true, error: null })
+    try {
+      const created = await authService.createUser(dto)
+      set((state) => ({
+        users: [...state.users, created],
+        loading: false,
+      }))
+      return { ok: true }
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Error al crear usuario'
+      set({ error: message, loading: false })
+      return { ok: false, error: message }
     }
   },
 
@@ -108,6 +136,32 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
       return { ok: true }
     } catch (err: any) {
       const message = err.response?.data?.message || 'Error al eliminar usuario'
+      set({ error: message, loading: false })
+      return { ok: false, error: message }
+    }
+  },
+
+  updateProfile: async (dto) => {
+    set({ loading: true, error: null })
+    try {
+      const { user } = await authService.updateProfile(dto)
+      set({ user, loading: false })
+      return { ok: true }
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Error al actualizar el perfil'
+      set({ error: message, loading: false })
+      return { ok: false, error: message }
+    }
+  },
+
+  updateCompany: async (dto) => {
+    set({ loading: true, error: null })
+    try {
+      const { user } = await authService.updateCompany(dto)
+      set({ user, loading: false })
+      return { ok: true }
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Error al actualizar los datos de la empresa'
       set({ error: message, loading: false })
       return { ok: false, error: message }
     }

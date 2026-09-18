@@ -1,22 +1,32 @@
 import { useState, useEffect } from 'react'
-import { Search, Edit, Trash2, Shield, UserCircle, Loader2 } from 'lucide-react'
+import { Search, Edit, Trash2, Shield, UserCircle, UserPlus, Loader2 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import type { Role } from '../stores/authStore'
 import { formatDate } from '../lib/utils'
+import { ROLES } from '../lib/permissions'
 import Modal from '../components/Modal'
+
+const ROLE_OPTIONS = Object.keys(ROLES) as Role[]
+
+const roleBadge: Record<Role, string> = {
+  admin: 'bg-purple-100 text-purple-700',
+  vendedor: 'bg-blue-100 text-blue-700',
+  inventario: 'bg-amber-100 text-amber-700',
+}
 
 export default function UserManagement() {
   const currentUser = useAuthStore((s) => s.user)
   const users = useAuthStore((s) => s.users)
   const loading = useAuthStore((s) => s.loading)
   const fetchUsers = useAuthStore((s) => s.fetchUsers)
+  const createUser = useAuthStore((s) => s.createUser)
   const updateUser = useAuthStore((s) => s.updateUser)
   const deleteUser = useAuthStore((s) => s.deleteUser)
 
   const [search, setSearch] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [form, setForm] = useState({ name: '', email: '', role: 'user' as Role, password: '' })
+  const [form, setForm] = useState({ name: '', email: '', role: 'vendedor' as Role, password: '' })
   const [error, setError] = useState('')
 
   const isAdmin = currentUser?.role === 'admin'
@@ -30,6 +40,13 @@ export default function UserManagement() {
     u.email.toLowerCase().includes(search.toLowerCase())
   )
 
+  const openCreate = () => {
+    setForm({ name: '', email: '', role: 'vendedor', password: '' })
+    setEditingId(null)
+    setError('')
+    setIsModalOpen(true)
+  }
+
   const openEdit = (user: typeof users[0]) => {
     setForm({ name: user.name, email: user.email, role: user.role, password: '' })
     setEditingId(user.id)
@@ -39,27 +56,39 @@ export default function UserManagement() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!editingId) return
     setError('')
 
-    const updates: { name?: string; email?: string; role?: Role; password?: string } = {
-      name: form.name,
-      email: form.email,
-      role: form.role,
-    }
-    if (form.password) {
-      if (form.password.length < 6) {
-        setError('La contraseña debe tener al menos 6 caracteres')
-        return
-      }
-      updates.password = form.password
+    if (form.password && form.password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres')
+      return
     }
 
-    const result = await updateUser(editingId, updates)
+    let result
+    if (editingId) {
+      const updates: { name?: string; email?: string; role?: Role; password?: string } = {
+        name: form.name,
+        email: form.email,
+        role: form.role,
+      }
+      if (form.password) updates.password = form.password
+      result = await updateUser(editingId, updates)
+    } else {
+      if (!form.password) {
+        setError('La contraseña es obligatoria al crear un usuario')
+        return
+      }
+      result = await createUser({
+        user: form.name,
+        email: form.email,
+        password: form.password,
+        role: form.role,
+      })
+    }
+
     if (result.ok) {
       setIsModalOpen(false)
     } else {
-      setError(result.error || 'Error al actualizar')
+      setError(result.error || 'Error al guardar el usuario')
     }
   }
 
@@ -87,9 +116,17 @@ export default function UserManagement() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Gestión de Usuarios</h1>
-            <p className="text-sm text-gray-500 mt-1">Administra las cuentas y permisos del sistema</p>
+            <p className="text-sm text-gray-500 mt-1">Crea sub-usuarios y asigna su rol para esta empresa</p>
           </div>
-          <span className="text-sm text-gray-500">{users.length} usuario{users.length !== 1 ? 's' : ''}</span>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-gray-500">{users.length} usuario{users.length !== 1 ? 's' : ''}</span>
+            <button
+              onClick={openCreate}
+              className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-2 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium"
+            >
+              <UserPlus className="w-4 h-4" /> Nuevo Usuario
+            </button>
+          </div>
         </div>
       </div>
 
@@ -99,6 +136,12 @@ export default function UserManagement() {
           className="w-full pl-10 pr-4 py-2 bg-white border-0 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm transition-all" />
       </div>
 
+      {loading && users.length === 0 ? (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-6 h-6 animate-spin text-violet-500" />
+          <span className="ml-2 text-gray-500">Cargando usuarios...</span>
+        </div>
+      ) : (
       <div className="bg-white rounded-2xl shadow-sm overflow-hidden overflow-x-auto">
         <table className="w-full text-sm min-w-[600px]">
           <thead className="bg-gray-50/80">
@@ -129,13 +172,9 @@ export default function UserManagement() {
                   </td>
                   <td className="px-6 py-4 text-gray-500">{u.email}</td>
                   <td className="px-6 py-4 text-center">
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
-                      u.role === 'admin'
-                        ? 'bg-purple-100 text-purple-700'
-                        : 'bg-gray-100 text-gray-600'
-                    }`}>
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${roleBadge[u.role] ?? 'bg-gray-100 text-gray-600'}`}>
                       {u.role === 'admin' && <Shield className="w-3 h-3" />}
-                      {u.role === 'admin' ? 'Admin' : 'Usuario'}
+                      {ROLES[u.role]?.label ?? u.role}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-gray-500">{formatDate(u.createdAt)}</td>
@@ -157,8 +196,9 @@ export default function UserManagement() {
           </tbody>
         </table>
       </div>
+      )}
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Editar Usuario">
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title={editingId ? 'Editar Usuario' : 'Nuevo Usuario'}>
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
             <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-2xl p-3">
@@ -179,23 +219,28 @@ export default function UserManagement() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Rol</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Rol *</label>
               <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all">
-                <option value="admin">Administrador</option>
-                <option value="user">Usuario</option>
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all bg-white">
+                {ROLE_OPTIONS.map((r) => (
+                  <option key={r} value={r}>{ROLES[r].label}</option>
+                ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Nueva contraseña</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                {editingId ? 'Nueva contraseña' : 'Contraseña *'}
+              </label>
               <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder="Dejar vacío para no cambiar"
+                placeholder={editingId ? 'Dejar vacío para no cambiar' : 'Mínimo 6 caracteres'}
                 className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all" />
             </div>
           </div>
           <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
             <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors text-sm font-medium">Cancelar</button>
-            <button type="submit" className="px-4 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium">Guardar Cambios</button>
+            <button type="submit" className="px-4 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium">
+              {editingId ? 'Guardar Cambios' : 'Crear Usuario'}
+            </button>
           </div>
         </form>
       </Modal>
