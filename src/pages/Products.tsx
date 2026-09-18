@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Plus, Search, Edit, Trash2, ShoppingCart, ShoppingBag, Package, ImageIcon, X, Ruler, Calendar, XCircle, Upload } from 'lucide-react'
 import { useProductStore } from '../stores/productStore'
 import { useCartStore } from '../stores/cartStore'
@@ -29,6 +29,8 @@ const columns: Column<Product>[] = [
   {
     key: 'image',
     header: 'Imagen',
+    hideBelow: 'sm',
+    width: '4.5rem',
     render: (p) =>
       p.image ? (
         <img
@@ -43,14 +45,14 @@ const columns: Column<Product>[] = [
         </div>
       ),
   },
-  { key: 'name', header: 'Nombre', cellClassName: 'font-medium text-gray-900' },
+  { key: 'name', header: 'Nombre', cellClassName: 'font-medium text-gray-900', truncate: true },
   { key: 'code', header: 'Código', hideBelow: 'lg', cellClassName: 'text-gray-500 font-mono text-xs' },
   { key: 'sku', header: 'SKU', hideBelow: 'lg', cellClassName: 'text-gray-500 font-mono text-xs' },
   { key: 'type', header: 'Tipo', hideBelow: 'xl', cellClassName: 'text-gray-500' },
   {
     key: 'category',
     header: 'Categoría',
-    hideBelow: 'md',
+    hideBelow: 'lg',
     render: (p) => (
       <span className="inline-flex px-2.5 py-1 bg-violet-50 text-violet-600 rounded-lg text-xs font-medium">
         {p.category}
@@ -58,11 +60,12 @@ const columns: Column<Product>[] = [
     ),
   },
   { key: 'purchasePrice', header: 'P. Compra', align: 'right', hideBelow: 'xl', render: (p) => formatCurrency(p.purchasePrice) },
-  { key: 'salePrice', header: 'P. Venta', align: 'right', render: (p) => formatCurrency(p.salePrice) },
+  { key: 'salePrice', header: 'P. Venta', align: 'right', hideBelow: 'sm', width: '7rem', render: (p) => formatCurrency(p.salePrice) },
   {
     key: 'stock',
     header: 'Stock',
     align: 'right',
+    width: '6rem',
     render: (p) => (
       <span
         className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-semibold ${
@@ -92,6 +95,8 @@ export default function Products() {
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [sizeSelectorProduct, setSizeSelectorProduct] = useState<Product | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const submittingRef = useRef(false)
 
   useEffect(() => {
     fetchProducts()
@@ -149,6 +154,9 @@ export default function Products() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (submittingRef.current) return
+    submittingRef.current = true
+    setSubmitting(true)
     const payload = {
       ...form,
       image: form.image.trim() || null,
@@ -171,8 +179,16 @@ export default function Products() {
       setIsModalOpen(false)
       setImageFile(null)
       setImagePreview(null)
+      if (editingId) {
+        await fetchProducts()
+      } else {
+        setPage(1)
+      }
     } catch {
       // error se maneja en el store
+    } finally {
+      submittingRef.current = false
+      setSubmitting(false)
     }
   }
 
@@ -311,7 +327,7 @@ export default function Products() {
                   }
                 }}
                 title="Agregar al carrito"
-                className="p-2 rounded-xl hover:bg-violet-50 text-violet-500 transition-colors"
+                className="hidden sm:flex p-2 rounded-xl hover:bg-violet-50 text-violet-500 transition-colors"
               >
                 <ShoppingCart className="w-4 h-4" />
               </button>
@@ -579,9 +595,10 @@ export default function Products() {
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-violet-600 to-indigo-600 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25"
+              disabled={submitting}
+              className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-violet-600 to-indigo-600 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
             >
-              {editingId ? 'Actualizar' : 'Crear'}
+              {submitting ? (editingId ? 'Guardando...' : 'Creando...') : (editingId ? 'Actualizar' : 'Crear')}
             </button>
           </div>
         </form>

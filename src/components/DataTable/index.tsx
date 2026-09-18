@@ -10,7 +10,7 @@ function cellValue<T>(row: T, col: Column<T>) {
   return value === undefined || value === null || value === '' ? <span className="text-gray-300">—</span> : String(value)
 }
 
-const alignClass = (align?: 'left' | 'right') => (align === 'right' ? 'text-right' : 'text-left')
+const alignClass = (align?: 'left' | 'center' | 'right') => (align === 'right' ? 'text-right' : align === 'center' ? 'text-center' : 'text-left')
 
 export default function DataTable<T>({
   columns,
@@ -32,6 +32,8 @@ export default function DataTable<T>({
 
   const isVisible = (col: Column<T>) => {
     switch (col.hideBelow) {
+      case 'sm':
+        return breakpoints.sm
       case 'md':
         return breakpoints.md
       case 'lg':
@@ -50,21 +52,22 @@ export default function DataTable<T>({
   const skeletonRows = pagination?.limit ?? 5
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm overflow-hidden overflow-x-auto">
-      <table className="w-full text-sm">
+    <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+      <table className="w-full text-sm table-fixed">
         <thead className="bg-gray-50/80">
           <tr>
             {expandable && <th className="w-10 px-2 py-4" aria-label="Expandir" />}
             {visibleColumns.map((col) => (
               <th
                 key={col.key}
-                className={`${alignClass(col.align)} px-6 py-4 font-semibold text-gray-600 text-xs uppercase tracking-wider ${col.headerClassName ?? ''}`}
+                style={col.width ? { width: col.width } : undefined}
+                className={`${alignClass(col.align)} px-3 sm:px-4 lg:px-6 py-4 font-semibold text-gray-600 text-xs uppercase tracking-wider ${col.headerClassName ?? ''}`}
               >
-                {col.header}
+                {col.truncate ? <span className="block truncate">{col.header}</span> : col.header}
               </th>
             ))}
             {actions && (
-              <th className="text-right px-6 py-4 font-semibold text-gray-600 text-xs uppercase tracking-wider">Acciones</th>
+              <th className="text-right px-2 sm:px-6 py-4 font-semibold text-gray-600 text-xs uppercase tracking-wider">Acciones</th>
             )}
           </tr>
         </thead>
@@ -78,12 +81,12 @@ export default function DataTable<T>({
                   </td>
                 )}
                 {visibleColumns.map((col) => (
-                  <td key={col.key} className="px-6 py-4">
+                  <td key={col.key} className="px-3 sm:px-4 lg:px-6 py-4">
                     <div className="h-4 rounded-full bg-gray-100 animate-pulse" style={{ width: `${55 + ((i * 13 + col.key.length * 7) % 35)}%` }} />
                   </td>
                 ))}
                 {actions && (
-                  <td className="px-6 py-4">
+                  <td className="px-2 sm:px-6 py-4">
                     <div className="h-4 w-16 ml-auto rounded-full bg-gray-100 animate-pulse" />
                   </td>
                 )}
@@ -121,11 +124,15 @@ export default function DataTable<T>({
                       </td>
                     )}
                     {visibleColumns.map((col) => (
-                      <td key={col.key} className={`${alignClass(col.align)} px-6 py-4 ${col.cellClassName ?? ''}`}>
-                        {cellValue(row, col)}
+                      <td
+                        key={col.key}
+                        style={col.width ? { width: col.width } : undefined}
+                        className={`${alignClass(col.align)} px-3 sm:px-4 lg:px-6 py-4 overflow-hidden ${col.cellClassName ?? ''}`}
+                      >
+                        {col.truncate ? <div className="min-w-0 truncate">{cellValue(row, col)}</div> : cellValue(row, col)}
                       </td>
                     ))}
-                    {actions && <td className="px-6 py-4 text-right">{actions(row)}</td>}
+                    {actions && <td className="px-2 sm:px-6 py-4 text-right">{actions(row)}</td>}
                   </tr>
                   {isExpanded && (
                     <tr className="bg-violet-50/40">

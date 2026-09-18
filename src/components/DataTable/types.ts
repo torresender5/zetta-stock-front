@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-export type Breakpoint = 'md' | 'lg' | 'xl'
+export type Breakpoint = 'sm' | 'md' | 'lg' | 'xl'
 
 export interface Column<T> {
   key: string
@@ -9,6 +9,10 @@ export interface Column<T> {
   align?: 'left' | 'right'
   /** Breakpoint desde el cual la columna es visible. Si se omite, siempre es visible. */
   hideBelow?: Breakpoint
+  /** Ancho fijo de la columna (CSS). Requiere table-fixed. */
+  width?: string
+  /** Aplicar ellipsis/truncado al contenido de la celda. */
+  truncate?: boolean
   headerClassName?: string
   cellClassName?: string
 }

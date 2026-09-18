@@ -92,12 +92,25 @@ export interface Sale {
   id: string
   clientId: string
   clientName: string
+  client?: {
+    id?: string | number
+    name?: string
+    document?: string
+    address?: string
+    phone?: string
+    email?: string
+  } | null
+  saleNumber?: string | null
   date: string
   items: SaleItem[]
   subtotal: number
   tax: number
   total: number
-  paymentStatus: 'paid' | 'pending'
+  paymentStatus: 'paid' | 'pending' | 'cancelled'
+  cancelledReason?: string | null
+  refundAmount?: number | null
+  refundMethod?: string | null
+  invoice?: Invoice | null
   createdAt: string
 }
 
@@ -114,6 +127,8 @@ export interface Invoice {
   subtotal: number
   tax: number
   total: number
-  status: 'paid' | 'pending'
+  status: 'paid' | 'pending' | 'cancelled'
+  cancelledReason?: string | null
+  sale?: { items?: SaleItem[] } | null
   createdAt: string
 }

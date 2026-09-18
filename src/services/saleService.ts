@@ -1,11 +1,18 @@
 import api from '../lib/api'
-import type { Sale, SaleItem, Invoice } from '../types'
+import type { Sale, SaleItem, Invoice, PaginatedResponse } from '../types'
 
 export interface CreateSaleDto {
   clientId: string
   date: string
   items: SaleItem[]
   paymentStatus: 'paid' | 'pending'
+}
+
+export interface UpdateSaleStatusDto {
+  paymentStatus: 'paid' | 'pending' | 'cancelled'
+  cancelledReason?: string
+  refundAmount?: number
+  refundMethod?: string
 }
 
 export interface SaleWithInvoice {
@@ -15,7 +22,26 @@ export interface SaleWithInvoice {
 
 export const saleService = {
   getAll: async (): Promise<Sale[]> => {
-    const { data } = await api.get<Sale[]>('/sales')
+    const limit = 100
+    let page = 1
+    let totalPages = 1
+    const all: Sale[] = []
+    do {
+      const { data } = await api.get<PaginatedResponse<Sale>>('/sales', { params: { page, limit } })
+      all.push(...data.data)
+      totalPages = data.meta.totalPages
+      page += 1
+    } while (page <= totalPages)
+    return all
+  },
+
+  getPage: async (params: { page: number; limit: number }): Promise<PaginatedResponse<Sale>> => {
+    const { data } = await api.get<PaginatedResponse<Sale>>('/sales', { params })
+    return data
+  },
+
+  getById: async (id: string): Promise<Sale> => {
+    const { data } = await api.get<Sale>(`/sales/${id}`)
     return data
   },
 
@@ -24,8 +50,8 @@ export const saleService = {
     return data
   },
 
-  updatePaymentStatus: async (id: string, status: 'paid' | 'pending'): Promise<Sale> => {
-    const { data } = await api.patch<Sale>(`/sales/${id}`, { paymentStatus: status })
+  updatePaymentStatus: async (id: string, body: UpdateSaleStatusDto): Promise<Sale> => {
+    const { data } = await api.patch<Sale>(`/sales/${id}`, body)
     return data
   },
 }

@@ -63,9 +63,9 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       >
         <div className="relative p-5 flex items-center justify-center">
           <img
-            src="/logo.png"
+            src="/logo-sidebar.png?v=2"
             alt="zettastock"
-            className="w-full max-w-[200px] h-auto object-contain bg-white rounded-xl p-1.5 shadow-lg shadow-black/20"
+            className="w-full max-w-[200px] h-auto object-contain"
           />
           <button
             onClick={onClose}

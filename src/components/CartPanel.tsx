@@ -45,12 +45,12 @@ export default function CartPanel({ isOpen, onClose }: CartPanelProps) {
     }))
 
     try {
-      const invoice = await addSale(clientId, new Date().toISOString().split('T')[0], saleItems, paymentStatus)
+      await addSale(clientId, new Date().toISOString().split('T')[0], saleItems, paymentStatus)
       clear()
       setClientId('')
       setPaymentStatus('paid')
       onClose()
-      navigate(`/invoices?saleId=${invoice.saleId}`)
+      navigate('/sales')
     } catch {
       // error se maneja en el store
     }

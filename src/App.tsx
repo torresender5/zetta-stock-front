@@ -9,6 +9,7 @@ import Clients from './pages/Clients'
 import Suppliers from './pages/Suppliers'
 import Purchases from './pages/Purchases'
 import Sales from './pages/Sales'
+import SaleDetails from './pages/SaleDetails'
 import Invoices from './pages/Invoices'
 import AccountsPayable from './pages/AccountsPayable'
 import AccountsReceivable from './pages/AccountsReceivable'
@@ -39,6 +40,7 @@ export default function App() {
         <Route path="/suppliers" element={<RequireRole view="suppliers"><Suppliers /></RequireRole>} />
         <Route path="/purchases" element={<RequireRole view="purchases"><Purchases /></RequireRole>} />
         <Route path="/sales" element={<RequireRole view="sales"><Sales /></RequireRole>} />
+        <Route path="/sales/:id" element={<RequireRole view="sales"><SaleDetails /></RequireRole>} />
         <Route path="/invoices" element={<RequireRole view="invoices"><Invoices /></RequireRole>} />
         <Route path="/accounts-payable" element={<RequireRole view="accountsPayable"><AccountsPayable /></RequireRole>} />
         <Route path="/accounts-receivable" element={<RequireRole view="accountsReceivable"><AccountsReceivable /></RequireRole>} />

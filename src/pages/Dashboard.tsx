@@ -106,15 +106,16 @@ export default function Dashboard() {
     if (canReadModule(role, 'invoices')) fetchInvoices()
   }, [role])
 
+  const activeSales = sales.filter((s) => s.paymentStatus !== 'cancelled')
   const totalPurchases = purchases.reduce((sum, p) => sum + p.total, 0)
-  const totalSales = sales.reduce((sum, s) => sum + s.total, 0)
+  const totalSales = activeSales.reduce((sum, s) => sum + s.total, 0)
   const pendingInvoices = invoices.filter((i) => i.status === 'pending').length
   const lowStock = products.filter((p) => p.stock < 10).length
 
   const hasSales = canReadModule(role, 'sales')
   const hasPurchases = canReadModule(role, 'purchases')
 
-  const chartData = useMemo(() => groupSalesByPeriod(sales, period), [sales, period])
+  const chartData = useMemo(() => groupSalesByPeriod(activeSales, period), [activeSales, period])
 
   const accountsPayable = useMemo(() => {
     const pending = purchases.filter((p) => (p.paymentStatus ?? 'paid') === 'pending')
