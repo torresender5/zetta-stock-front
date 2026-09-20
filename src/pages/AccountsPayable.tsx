@@ -1,7 +1,7 @@
 import { useMemo, useEffect } from 'react'
 import { CheckCircle } from 'lucide-react'
 import { usePurchaseStore } from '../stores/purchaseStore'
-import { formatCurrency, formatDate } from '../lib/utils'
+import { formatCurrency, formatDateOnly } from '../lib/utils'
 
 export default function AccountsPayable() {
   const { purchases, fetchPurchases, updatePurchasePaymentStatus } = usePurchaseStore()
@@ -67,7 +67,7 @@ export default function AccountsPayable() {
                   <tbody className="divide-y divide-gray-100">
                     {supplierPurchases.map((p) => (
                       <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-6 py-4">{formatDate(p.date)}</td>
+                        <td className="px-6 py-4">{formatDateOnly(p.date)}</td>
                         <td className="px-6 py-4 text-right">{p.items.length}</td>
                         <td className="px-6 py-4 text-right font-medium">{formatCurrency(p.total)}</td>
                         <td className="px-6 py-4 text-center">

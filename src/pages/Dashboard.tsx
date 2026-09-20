@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { Package, Users, ShoppingCart, TrendingUp, FileText, DollarSign, CreditCard, HandCoins, Trophy, Medal, Star } from 'lucide-react'
+import { Package, Users, ShoppingCart, TrendingUp, FileText, DollarSign, CreditCard, HandCoins, Wallet, Trophy, Medal, Star } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -9,10 +9,11 @@ import { useProductStore } from '../stores/productStore'
 import { useClientStore } from '../stores/clientStore'
 import { usePurchaseStore } from '../stores/purchaseStore'
 import { useSaleStore } from '../stores/saleStore'
+import { useCajaStore } from '../stores/cajaStore'
 import { useAuthStore } from '../stores/authStore'
 import { canReadModule } from '../lib/permissions'
 import type { ModuleKey } from '../lib/permissions'
-import { formatCurrency } from '../lib/utils'
+import { formatCurrency, formatDate } from '../lib/utils'
 import type { Sale } from '../types'
 
 type Period = 'day' | 'week' | 'month'
@@ -96,6 +97,7 @@ export default function Dashboard() {
   const { clients, fetchClients } = useClientStore()
   const { purchases, fetchPurchases } = usePurchaseStore()
   const { sales, invoices, fetchSales, fetchInvoices } = useSaleStore()
+  const { active: activeCaja, summary: cajaSummary, fetchActive: fetchActiveCaja } = useCajaStore()
   const [period, setPeriod] = useState<Period>('day')
 
   useEffect(() => {
@@ -104,6 +106,7 @@ export default function Dashboard() {
     if (canReadModule(role, 'purchases')) fetchPurchases()
     if (canReadModule(role, 'sales')) fetchSales()
     if (canReadModule(role, 'invoices')) fetchInvoices()
+    if (canReadModule(role, 'sales')) fetchActiveCaja()
   }, [role])
 
   const activeSales = sales.filter((s) => s.paymentStatus !== 'cancelled')
@@ -208,6 +211,36 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {/* Caja activa */}
+      {hasSales && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl p-5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-white/15 rounded-xl">
+              <Wallet className="w-6 h-6" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-sm text-violet-200">Caja activa</p>
+              <p className="text-xl font-bold tabular-nums">
+                {activeCaja
+                  ? formatCurrency(cajaSummary?.expectedTotal ?? activeCaja.baseAmount)
+                  : 'Sin caja abierta'}
+              </p>
+              <p className="text-xs text-violet-200">
+                {activeCaja
+                  ? `${activeCaja.name} · Abierta ${formatDate(activeCaja.openedAt)}`
+                  : 'Abre tu turno para registrar ventas y hacer el arqueo'}
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/caja"
+            className="inline-flex items-center gap-2 text-sm font-medium bg-white/15 hover:bg-white/25 rounded-xl px-4 py-2.5 transition-colors shrink-0"
+          >
+            <Wallet className="w-4 h-4" /> Ir a Caja
+          </Link>
+        </div>
+      )}
 
       {/* Charts */}
       {hasSales && (

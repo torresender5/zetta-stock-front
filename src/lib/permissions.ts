@@ -8,12 +8,14 @@ export const ROLES: Record<Role, { label: string }> = {
 
 export type ViewKey =
   | 'dashboard'
+  | 'caja'
   | 'products'
   | 'clients'
   | 'suppliers'
   | 'purchases'
   | 'sales'
   | 'invoices'
+  | 'apartados'
   | 'accountsPayable'
   | 'accountsReceivable'
   | 'users'
@@ -21,12 +23,14 @@ export type ViewKey =
 
 export const VIEW_ROLES: Record<ViewKey, Role[]> = {
   dashboard: ['admin', 'vendedor', 'inventario'],
+  caja: ['admin', 'vendedor'],
   products: ['admin', 'inventario'],
   clients: ['admin', 'vendedor'],
   suppliers: ['admin', 'inventario'],
   purchases: ['admin', 'inventario'],
   sales: ['admin', 'vendedor'],
   invoices: ['admin', 'vendedor'],
+  apartados: ['admin', 'vendedor'],
   accountsPayable: ['admin', 'inventario'],
   accountsReceivable: ['admin', 'vendedor'],
   users: ['admin'],

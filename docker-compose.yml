@@ -1,0 +1,12 @@
+services:
+  zettastock-front:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://187.7.20.13:3000/}
+    image: torresender5/zettastock-front:latest
+    container_name: zettastock-front
+    restart: unless-stopped
+    ports:
+      - "5173:80"

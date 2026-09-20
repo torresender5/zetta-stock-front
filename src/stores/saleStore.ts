@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { Sale, SaleItem, Invoice, PaginationMeta } from '../types'
+import type { Sale, SaleItem, Invoice, PaginationMeta, PaymentMethod } from '../types'
 import { saleService, invoiceService } from '../services/saleService'
 import { useProductStore } from './productStore'
 
@@ -31,13 +31,21 @@ interface SaleStore {
   setPage: (page: number) => void
   setLimit: (limit: number) => void
   fetchInvoices: () => Promise<void>
-  addSale: (clientId: string, date: string, items: SaleItem[], paymentStatus: 'paid' | 'pending') => Promise<Invoice>
+  addSale: (
+    clientId: string,
+    date: string,
+    items: SaleItem[],
+    paymentStatus: 'paid' | 'pending',
+    paymentMethod: PaymentMethod,
+    receivedAmount?: number,
+  ) => Promise<Invoice>
   updateSalePaymentStatus: (
     id: string,
     status: 'paid' | 'pending' | 'cancelled',
     cancelledReason?: string,
     refundAmount?: number,
     refundMethod?: string,
+    paymentMethod?: PaymentMethod,
   ) => Promise<void>
   updateInvoiceStatus: (id: string, status: 'paid' | 'pending') => Promise<void>
 }
@@ -109,10 +117,17 @@ export const useSaleStore = create<SaleStore>()((set, get) => ({
     }
   },
 
-  addSale: async (clientId, date, items, paymentStatus) => {
+  addSale: async (clientId, date, items, paymentStatus, paymentMethod, receivedAmount) => {
     set({ loading: true, error: null })
     try {
-      const { sale, invoice } = await saleService.create({ clientId, date, items, paymentStatus })
+      const { sale, invoice } = await saleService.create({
+        clientId,
+        date,
+        items,
+        paymentStatus,
+        paymentMethod,
+        receivedAmount,
+      })
       // Reducir stock local
       const { updateStock } = useProductStore.getState()
       for (const item of items) {
@@ -131,7 +146,7 @@ export const useSaleStore = create<SaleStore>()((set, get) => ({
     }
   },
 
-  updateSalePaymentStatus: async (saleId, status, cancelledReason, refundAmount, refundMethod) => {
+  updateSalePaymentStatus: async (saleId, status, cancelledReason, refundAmount, refundMethod, paymentMethod) => {
     set({ loading: true, error: null })
     try {
       const updated = await saleService.updatePaymentStatus(saleId, {
@@ -139,6 +154,7 @@ export const useSaleStore = create<SaleStore>()((set, get) => ({
         cancelledReason,
         refundAmount,
         refundMethod,
+        paymentMethod,
       })
       set((state) => ({
         sales: state.sales.map((s) => (s.id === saleId ? toSale(updated) : s)),

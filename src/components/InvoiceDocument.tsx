@@ -1,7 +1,7 @@
 import { Building2, CheckCircle, Clock, XCircle, AlertTriangle } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import type { Invoice } from '../types'
-import { formatCurrency, formatDate } from '../lib/utils'
+import { formatCurrency, formatDateOnly } from '../lib/utils'
 
 export function InvoiceStatusBadge({ status }: { status: Invoice['status'] }) {
   if (status === 'paid') {
@@ -60,7 +60,7 @@ export default function InvoiceDocument({ invoice }: InvoiceDocumentProps) {
           <div className="sm:text-right">
             <p className="text-xs font-semibold text-gray-400 uppercase tracking-widest">Factura de venta</p>
             <p className="text-xl font-mono font-semibold text-violet-600 mt-1">{invoice.invoiceNumber}</p>
-            <p className="text-sm text-gray-500 mt-1">Fecha: {formatDate(invoice.date)}</p>
+            <p className="text-sm text-gray-500 mt-1">Fecha: {formatDateOnly(invoice.date)}</p>
             <div className="mt-2 flex justify-start sm:justify-end">
               <InvoiceStatusBadge status={invoice.status} />
             </div>

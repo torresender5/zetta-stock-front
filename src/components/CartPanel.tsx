@@ -3,9 +3,17 @@ import { X, Trash2, Minus, Plus, ShoppingBag } from 'lucide-react'
 import { useCartStore } from '../stores/cartStore'
 import { useClientStore } from '../stores/clientStore'
 import { useSaleStore } from '../stores/saleStore'
-import { formatCurrency, TAX_RATE } from '../lib/utils'
+import { formatCurrency, TAX_RATE, todayLocal } from '../lib/utils'
 import { ClientSelect } from './ClientSelect'
 import { useNavigate } from 'react-router-dom'
+import type { PaymentMethod } from '../types'
+
+const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
+  { value: 'cash', label: 'Efectivo' },
+  { value: 'card', label: 'Tarjeta' },
+  { value: 'transfer', label: 'Transferencia' },
+  { value: 'credit', label: 'Crédito' },
+]
 
 interface CartPanelProps {
   isOpen: boolean
@@ -20,6 +28,7 @@ export default function CartPanel({ isOpen, onClose }: CartPanelProps) {
 
   const [clientId, setClientId] = useState('')
   const [paymentStatus, setPaymentStatus] = useState<'paid' | 'pending'>('paid')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
 
   useEffect(() => {
     if (isOpen && clients.length === 0) {
@@ -45,10 +54,17 @@ export default function CartPanel({ isOpen, onClose }: CartPanelProps) {
     }))
 
     try {
-      await addSale(clientId, new Date().toISOString().split('T')[0], saleItems, paymentStatus)
+      await addSale(
+        clientId,
+        todayLocal(),
+        saleItems,
+        paymentStatus,
+        paymentStatus === 'paid' ? paymentMethod : 'credit',
+      )
       clear()
       setClientId('')
       setPaymentStatus('paid')
+      setPaymentMethod('cash')
       onClose()
       navigate('/sales')
     } catch {
@@ -187,6 +203,31 @@ export default function CartPanel({ isOpen, onClose }: CartPanelProps) {
                   </button>
                 </div>
               </fieldset>
+
+              {paymentStatus === 'paid' && (
+                <fieldset>
+                  <legend className="block text-sm font-medium text-foreground mb-1.5">
+                    Método de pago
+                  </legend>
+                  <div className="grid grid-cols-2 gap-2">
+                    {PAYMENT_METHODS.map((m) => (
+                      <button
+                        key={m.value}
+                        type="button"
+                        onClick={() => setPaymentMethod(m.value)}
+                        aria-pressed={paymentMethod === m.value}
+                        className={`py-2 text-sm font-medium rounded-xl border-2 transition-colors cursor-pointer ${
+                          paymentMethod === m.value
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-gray-200 text-muted-foreground hover:border-gray-300'
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
             </div>
           </div>
         )}

@@ -1,11 +1,19 @@
 import api from '../lib/api'
-import type { Sale, SaleItem, Invoice, PaginatedResponse } from '../types'
+import type {
+  Sale,
+  SaleItem,
+  Invoice,
+  PaymentMethod,
+  PaginatedResponse,
+} from '../types'
 
 export interface CreateSaleDto {
   clientId: string
   date: string
   items: SaleItem[]
   paymentStatus: 'paid' | 'pending'
+  paymentMethod: PaymentMethod
+  receivedAmount?: number
 }
 
 export interface UpdateSaleStatusDto {
@@ -13,6 +21,7 @@ export interface UpdateSaleStatusDto {
   cancelledReason?: string
   refundAmount?: number
   refundMethod?: string
+  paymentMethod?: PaymentMethod
 }
 
 export interface SaleWithInvoice {

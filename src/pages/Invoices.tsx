@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Eye, Printer, X, Search, FileText, ArrowLeft } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { useSaleStore } from '../stores/saleStore'
-import { formatCurrency, formatDate } from '../lib/utils'
+import { formatCurrency, formatDateOnly, todayLocal, dateOnlyToLocal } from '../lib/utils'
 import InvoiceDocument, { InvoiceStatusBadge } from '../components/InvoiceDocument'
 import type { Invoice } from '../types'
 
@@ -43,7 +43,6 @@ export default function Invoices() {
 
   const filtered = useMemo(() => {
     const now = new Date()
-    const todayStr = now.toISOString().split('T')[0]
     const startOfWeek = getStartOfWeek(now)
     const currentMonth = now.getMonth()
     const currentYear = now.getFullYear()
@@ -51,8 +50,9 @@ export default function Invoices() {
     return invoices.filter((inv) => {
       // Period filter
       if (period !== 'all') {
-        const invDate = new Date(inv.date)
-        if (period === 'day' && inv.date !== todayStr) return false
+        const invDate = dateOnlyToLocal(inv.date)
+        if (period === 'day' && invDate.toISOString().slice(0, 10) !== todayLocal())
+          return false
         if (period === 'week' && invDate < startOfWeek) return false
         if (period === 'month' && (invDate.getMonth() !== currentMonth || invDate.getFullYear() !== currentYear)) return false
       }
@@ -192,7 +192,7 @@ export default function Invoices() {
                     </div>
                     <p className="font-medium text-gray-900 truncate mt-2.5">{inv.clientName}</p>
                     <div className="flex items-center justify-between gap-2 mt-1">
-                      <span className="text-xs text-gray-500">{formatDate(inv.date)}</span>
+                      <span className="text-xs text-gray-500">{formatDateOnly(inv.date)}</span>
                       <span className="text-sm font-semibold text-gray-700 tabular-nums">{formatCurrency(inv.total)}</span>
                     </div>
                   </button>

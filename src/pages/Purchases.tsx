@@ -3,7 +3,7 @@ import { Plus, Trash2, Loader2 } from 'lucide-react'
 import { useProductStore } from '../stores/productStore'
 import { usePurchaseStore } from '../stores/purchaseStore'
 import { useSupplierStore } from '../stores/supplierStore'
-import { formatCurrency, formatDate } from '../lib/utils'
+import { formatCurrency, formatDateOnly, todayLocal } from '../lib/utils'
 import Modal from '../components/Modal'
 import type { PurchaseItem } from '../types'
 
@@ -13,7 +13,7 @@ export default function Purchases() {
   const { purchases, loading, error, fetchPurchases, addPurchase } = usePurchaseStore()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [supplierId, setSupplierId] = useState('')
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(todayLocal())
   const [paymentStatus, setPaymentStatus] = useState<'paid' | 'pending'>('paid')
   const [items, setItems] = useState<PurchaseItem[]>([])
 
@@ -103,7 +103,7 @@ export default function Purchases() {
               [...purchases].reverse().map((p) => (
                 <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
                   <td className="px-6 py-4 font-medium">{p.supplier}</td>
-                  <td className="px-6 py-4 text-gray-500">{formatDate(p.date)}</td>
+                  <td className="px-6 py-4 text-gray-500">{formatDateOnly(p.date)}</td>
                   <td className="px-6 py-4 text-right">{p.items.length}</td>
                   <td className="px-6 py-4 text-right font-medium">{formatCurrency(p.total)}</td>
                   <td className="px-6 py-4 text-center">

@@ -9,6 +9,8 @@ import {
   FileText,
   CreditCard,
   HandCoins,
+  PackagePlus,
+  Wallet,
   X,
   LogOut,
   UserCircle,
@@ -20,11 +22,13 @@ import type { ViewKey } from '../lib/permissions'
 
 const links: { to: string; label: string; icon: typeof LayoutDashboard; view: ViewKey }[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, view: 'dashboard' },
+  { to: '/caja', label: 'Caja', icon: Wallet, view: 'caja' },
   { to: '/products', label: 'Productos', icon: Package, view: 'products' },
   { to: '/clients', label: 'Clientes', icon: Users, view: 'clients' },
   { to: '/suppliers', label: 'Proveedores', icon: Truck, view: 'suppliers' },
   { to: '/purchases', label: 'Compras', icon: ShoppingCart, view: 'purchases' },
   { to: '/sales', label: 'Ventas', icon: TrendingUp, view: 'sales' },
+  { to: '/apartados', label: 'Apartados', icon: PackagePlus, view: 'apartados' },
   { to: '/invoices', label: 'Facturas', icon: FileText, view: 'invoices' },
   { to: '/accounts-payable', label: 'Cuentas por Pagar', icon: CreditCard, view: 'accountsPayable' },
   { to: '/accounts-receivable', label: 'Cuentas por Cobrar', icon: HandCoins, view: 'accountsReceivable' },

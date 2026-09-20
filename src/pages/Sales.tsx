@@ -4,16 +4,23 @@ import { useNavigate } from 'react-router-dom'
 import { useProductStore } from '../stores/productStore'
 import { useClientStore } from '../stores/clientStore'
 import { useSaleStore } from '../stores/saleStore'
-import { formatCurrency, formatDate, TAX_RATE } from '../lib/utils'
+import { formatCurrency, formatDateOnly, TAX_RATE, todayLocal } from '../lib/utils'
 import Modal from '../components/Modal'
 import ActionDropdown from '../components/ActionDropdown'
 import DataTable from '../components/DataTable'
 import { ProductSelect } from '../components/ProductSelect'
 import { ClientSelect } from '../components/ClientSelect'
 import type { Column } from '../components/DataTable/types'
-import type { Sale, SaleItem, Product } from '../types'
+import type { Sale, SaleItem, Product, PaymentMethod } from '../types'
 
 const REFUND_METHODS = ['Efectivo', 'Transferencia', 'Otro']
+
+const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
+  { value: 'cash', label: 'Efectivo' },
+  { value: 'card', label: 'Tarjeta' },
+  { value: 'transfer', label: 'Transferencia' },
+  { value: 'credit', label: 'Crédito' },
+]
 
 const statusBadge = (status: Sale['paymentStatus']) => {
   if (status === 'paid') {
@@ -50,7 +57,7 @@ const columns: Column<Sale>[] = [
       ),
   },
   { key: 'clientName', header: 'Cliente', cellClassName: 'font-medium text-gray-900', truncate: true },
-  { key: 'date', header: 'Fecha', hideBelow: 'sm', cellClassName: 'text-gray-500', render: (s) => formatDate(s.date) },
+  { key: 'date', header: 'Fecha', hideBelow: 'sm', cellClassName: 'text-gray-500', render: (s) => formatDateOnly(s.date) },
   { key: 'items', header: 'Productos', align: 'right', hideBelow: 'md', render: (s) => s.items.length },
   { key: 'subtotal', header: 'Subtotal', align: 'right', hideBelow: 'lg', render: (s) => formatCurrency(s.subtotal) },
   { key: 'tax', header: 'IVA', align: 'right', hideBelow: 'xl', render: (s) => formatCurrency(s.tax) },
@@ -75,8 +82,10 @@ export default function Sales() {
   const navigate = useNavigate()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [clientId, setClientId] = useState('')
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate] = useState(todayLocal())
   const [paymentStatus, setPaymentStatus] = useState<'paid' | 'pending'>('paid')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
+  const [receivedAmount, setReceivedAmount] = useState(0)
   const [items, setItems] = useState<SaleItem[]>([])
   const [draftProductId, setDraftProductId] = useState('')
   const [pendingProduct, setPendingProduct] = useState<Product | null>(null)
@@ -165,10 +174,21 @@ export default function Sales() {
     e.preventDefault()
     if (items.length === 0 || !clientId) return
     try {
-      await addSale(clientId, date, items, paymentStatus)
+      await addSale(
+        clientId,
+        date,
+        items,
+        paymentStatus,
+        paymentStatus === 'paid' ? paymentMethod : 'credit',
+        paymentStatus === 'paid' && paymentMethod === 'cash'
+          ? Number(receivedAmount) || 0
+          : undefined,
+      )
       setIsModalOpen(false)
       setClientId('')
       setPaymentStatus('paid')
+      setPaymentMethod('cash')
+      setReceivedAmount(0)
       setItems([])
       setDraftProductId('')
     } catch {
@@ -322,6 +342,57 @@ export default function Sales() {
               </label>
             </div>
           </div>
+
+          {paymentStatus === 'paid' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Método de pago *</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {PAYMENT_METHODS.map((m) => (
+                  <label
+                    key={m.value}
+                    className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border-2 cursor-pointer transition-colors ${
+                      paymentMethod === m.value
+                        ? 'border-violet-500 bg-violet-50 text-violet-700'
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value={m.value}
+                      checked={paymentMethod === m.value}
+                      onChange={() => setPaymentMethod(m.value)}
+                      className="sr-only"
+                    />
+                    <span className="text-sm font-medium">{m.label}</span>
+                  </label>
+                ))}
+              </div>
+
+              {paymentMethod === 'cash' && (
+                <div className="mt-4 grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Recibido (COP)</label>
+                    <input
+                      type="number"
+                      min={0}
+                      step="100"
+                      value={receivedAmount}
+                      onChange={(e) => setReceivedAmount(Number(e.target.value))}
+                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all tabular-nums"
+                      placeholder="0"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Vuelto</label>
+                    <div className="w-full border border-gray-200 rounded-xl px-4 py-2.5 bg-gray-50 text-sm font-semibold tabular-nums">
+                      {receivedAmount > total ? formatCurrency(receivedAmount - total) : formatCurrency(0)}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="mb-2">
             <label className="block text-sm font-medium text-gray-700 mb-2">Productos</label>

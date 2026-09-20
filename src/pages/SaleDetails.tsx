@@ -20,7 +20,7 @@ import {
 } from 'lucide-react'
 import { useSaleStore } from '../stores/saleStore'
 import { useProductStore } from '../stores/productStore'
-import { formatCurrency, formatDate } from '../lib/utils'
+import { formatCurrency, formatDate, formatDateOnly } from '../lib/utils'
 import Modal from '../components/Modal'
 import type { Sale, Product } from '../types'
 
@@ -177,7 +177,7 @@ export default function SaleDetails() {
                 <User className="w-4 h-4" /> {clientName}
               </span>
               <span className="inline-flex items-center gap-1.5">
-                <CalendarDays className="w-4 h-4" /> {formatDate(safeDate)}
+                <CalendarDays className="w-4 h-4" /> {formatDateOnly(safeDate)}
               </span>
             </div>
           </div>

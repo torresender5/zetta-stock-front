@@ -1,7 +1,7 @@
 import { useMemo, useEffect } from 'react'
 import { CheckCircle } from 'lucide-react'
 import { useSaleStore } from '../stores/saleStore'
-import { formatCurrency, formatDate } from '../lib/utils'
+import { formatCurrency, formatDateOnly } from '../lib/utils'
 
 export default function AccountsReceivable() {
   const { sales, fetchSales, updateSalePaymentStatus } = useSaleStore()
@@ -68,7 +68,7 @@ export default function AccountsReceivable() {
                   <tbody className="divide-y divide-gray-100">
                     {clientSales.map((s) => (
                       <tr key={s.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-6 py-4">{formatDate(s.date)}</td>
+                        <td className="px-6 py-4">{formatDateOnly(s.date)}</td>
                         <td className="px-6 py-4 text-right">{s.items.length}</td>
                         <td className="px-6 py-4 text-right font-medium">{formatCurrency(s.total)}</td>
                         <td className="px-6 py-4 text-center">

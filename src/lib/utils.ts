@@ -25,6 +25,28 @@ export function formatDate(dateStr: string | Date): string {
   })
 }
 
+export function todayLocal(): string {
+  const now = new Date()
+  const mm = String(now.getMonth() + 1).padStart(2, '0')
+  const dd = String(now.getDate()).padStart(2, '0')
+  return `${now.getFullYear()}-${mm}-${dd}`
+}
+
+export function formatDateOnly(dateStr: string | Date): string {
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return ''
+  return `${d.getUTCDate()} ${d.toLocaleString('es-CO', {
+    month: 'short',
+    timeZone: 'UTC',
+  })} ${d.getUTCFullYear()}`
+}
+
+export function dateOnlyToLocal(dateStr: string | Date): Date {
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return d
+  return new Date(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+}
+
 export const TAX_RATE = 0.19 // IVA 19%
 
 export const CATEGORIES = [
