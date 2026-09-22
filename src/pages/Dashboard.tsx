@@ -124,8 +124,9 @@ export default function Dashboard() {
     const pending = purchases.filter((p) => (p.paymentStatus ?? 'paid') === 'pending')
     const map: Record<string, { supplier: string; total: number }> = {}
     for (const p of pending) {
-      if (!map[p.supplier]) map[p.supplier] = { supplier: p.supplier, total: 0 }
-      map[p.supplier].total += p.total
+      const supplierName = p.supplier?.name ?? 'Sin proveedor'
+      if (!map[supplierName]) map[supplierName] = { supplier: supplierName, total: 0 }
+      map[supplierName].total += p.total
     }
     return Object.values(map).sort((a, b) => b.total - a.total)
   }, [purchases])

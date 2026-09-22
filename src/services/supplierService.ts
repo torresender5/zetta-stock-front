@@ -1,11 +1,22 @@
 import api from '../lib/api'
-import type { Supplier } from '../types'
+import type { Supplier, PaginatedResponse, SupplierQueryParams } from '../types'
 
 export type CreateSupplierDto = Omit<Supplier, 'id' | 'createdAt'>
 
 export const supplierService = {
+  // Lista completa (sin paginar) para dropdowns del modal de compra
   getAll: async (): Promise<Supplier[]> => {
-    const { data } = await api.get<Supplier[]>('/suppliers')
+    const { data } = await api.get<Supplier[]>('/suppliers/all')
+    return data
+  },
+
+  // Lista paginada y filtrable para la tabla de proveedores
+  getAllPaginated: async (
+    params: SupplierQueryParams = {}
+  ): Promise<PaginatedResponse<Supplier>> => {
+    const { data } = await api.get<PaginatedResponse<Supplier>>('/suppliers', {
+      params,
+    })
     return data
   },
 

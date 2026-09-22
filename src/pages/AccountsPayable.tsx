@@ -18,11 +18,12 @@ export default function AccountsPayable() {
   const groupedBySupplier = useMemo(() => {
     const map: Record<string, { supplier: string; total: number; purchases: typeof pendingPurchases }> = {}
     for (const p of pendingPurchases) {
-      if (!map[p.supplier]) {
-        map[p.supplier] = { supplier: p.supplier, total: 0, purchases: [] }
+      const supplierName = p.supplier?.name ?? 'Sin proveedor'
+      if (!map[supplierName]) {
+        map[supplierName] = { supplier: supplierName, total: 0, purchases: [] }
       }
-      map[p.supplier].total += p.total
-      map[p.supplier].purchases.push(p)
+      map[supplierName].total += p.total
+      map[supplierName].purchases.push(p)
     }
     return Object.values(map).sort((a, b) => b.total - a.total)
   }, [pendingPurchases])

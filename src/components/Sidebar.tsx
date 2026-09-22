@@ -11,13 +11,16 @@ import {
   HandCoins,
   PackagePlus,
   Wallet,
+  BarChart3,
   X,
   LogOut,
   UserCircle,
   Shield,
+  Crown,
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
-import { can, ROLES } from '../lib/permissions'
+import { useSubscriptionStore } from '../stores/subscriptionStore'
+import { canView, ROLES } from '../lib/permissions'
 import type { ViewKey } from '../lib/permissions'
 
 const links: { to: string; label: string; icon: typeof LayoutDashboard; view: ViewKey }[] = [
@@ -32,6 +35,8 @@ const links: { to: string; label: string; icon: typeof LayoutDashboard; view: Vi
   { to: '/invoices', label: 'Facturas', icon: FileText, view: 'invoices' },
   { to: '/accounts-payable', label: 'Cuentas por Pagar', icon: CreditCard, view: 'accountsPayable' },
   { to: '/accounts-receivable', label: 'Cuentas por Cobrar', icon: HandCoins, view: 'accountsReceivable' },
+  { to: '/reports', label: 'Reportes', icon: BarChart3, view: 'reports' },
+  { to: '/suscripcion', label: 'Suscripción', icon: Crown, view: 'suscripcion' },
   { to: '/perfil', label: 'Mi Perfil', icon: UserCircle, view: 'profile' },
   { to: '/users', label: 'Usuarios', icon: Shield, view: 'users' },
 ]
@@ -44,6 +49,7 @@ interface SidebarProps {
 export default function Sidebar({ isOpen, onClose }: SidebarProps) {
   const user = useAuthStore((s) => s.user)
   const logout = useAuthStore((s) => s.logout)
+  const plan = useSubscriptionStore((s) => s.subscription?.plan)
   const navigate = useNavigate()
 
   const handleLogout = () => {
@@ -82,7 +88,7 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
 
         <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
           {links
-            .filter((link) => can(user?.role, link.view))
+            .filter((link) => canView(user?.role, link.view, plan))
             .map(({ to, label, icon: Icon }) => (
               <NavLink
                 key={to}

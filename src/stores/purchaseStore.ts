@@ -1,48 +1,115 @@
 import { create } from 'zustand'
-import type { Purchase, PurchaseItem } from '../types'
+import type { Purchase, PurchaseItem, PaginationMeta } from '../types'
 import { purchaseService } from '../services/purchaseService'
 import { useProductStore } from './productStore'
 
+const emptyMeta: PaginationMeta = { total: 0, page: 1, limit: 10, totalPages: 1 }
+
 interface PurchaseStore {
   purchases: Purchase[]
+  meta: PaginationMeta
   loading: boolean
   error: string | null
+  page: number
+  limit: number
+  search: string
+  supplierFilter: string
+  paymentStatusFilter: '' | 'paid' | 'pending'
+  startDateFilter: string
+  endDateFilter: string
   fetchPurchases: () => Promise<void>
-  addPurchase: (supplierId: string, supplierName: string, date: string, items: PurchaseItem[], paymentStatus: 'paid' | 'pending') => Promise<void>
+  setPage: (page: number) => void
+  setLimit: (limit: number) => void
+  setSearch: (search: string) => void
+  setSupplierFilter: (supplierId: string) => void
+  setPaymentStatusFilter: (status: '' | 'paid' | 'pending') => void
+  setStartDateFilter: (date: string) => void
+  setEndDateFilter: (date: string) => void
+  addPurchase: (supplierId: string, date: string, items: PurchaseItem[], paymentStatus: 'paid' | 'pending') => Promise<void>
   updatePurchasePaymentStatus: (id: string, status: 'paid' | 'pending') => Promise<void>
 }
 
-export const usePurchaseStore = create<PurchaseStore>()((set) => ({
+export const usePurchaseStore = create<PurchaseStore>()((set, get) => ({
   purchases: [],
+  meta: emptyMeta,
   loading: false,
   error: null,
+  page: 1,
+  limit: 10,
+  search: '',
+  supplierFilter: '',
+  paymentStatusFilter: '',
+  startDateFilter: '',
+  endDateFilter: '',
 
   fetchPurchases: async () => {
+    const { page, limit, search, supplierFilter, paymentStatusFilter, startDateFilter, endDateFilter } = get()
     set({ loading: true, error: null })
     try {
-      const purchases = await purchaseService.getAll()
-      set({ purchases, loading: false })
+      const { data, meta } = await purchaseService.getAll({
+        page,
+        limit,
+        search: search || undefined,
+        supplierId: supplierFilter || undefined,
+        paymentStatus: paymentStatusFilter || undefined,
+        startDate: startDateFilter || undefined,
+        endDate: endDateFilter || undefined,
+      })
+      set({ purchases: data, meta, loading: false })
     } catch {
       set({ error: 'Error al cargar compras', loading: false })
     }
   },
 
-  addPurchase: async (supplierId, supplierName, date, items, paymentStatus) => {
+  setPage: (page) => {
+    set({ page })
+    get().fetchPurchases()
+  },
+
+  setLimit: (limit) => {
+    set({ limit, page: 1 })
+    get().fetchPurchases()
+  },
+
+  setSearch: (search) => {
+    set({ search, page: 1 })
+    get().fetchPurchases()
+  },
+
+  setSupplierFilter: (supplierFilter) => {
+    set({ supplierFilter, page: 1 })
+    get().fetchPurchases()
+  },
+
+  setPaymentStatusFilter: (paymentStatusFilter) => {
+    set({ paymentStatusFilter, page: 1 })
+    get().fetchPurchases()
+  },
+
+  setStartDateFilter: (startDateFilter) => {
+    set({ startDateFilter, page: 1 })
+    get().fetchPurchases()
+  },
+
+  setEndDateFilter: (endDateFilter) => {
+    set({ endDateFilter, page: 1 })
+    get().fetchPurchases()
+  },
+
+  addPurchase: async (supplierId, date, items, paymentStatus) => {
     set({ loading: true, error: null })
     try {
-      const newPurchase = await purchaseService.create({
+      await purchaseService.create({
         supplierId,
-        supplier: supplierName,
         date,
         items,
         paymentStatus,
       })
-      // Actualizar stock local de cada producto
-      const { updateStock } = useProductStore.getState()
-      for (const item of items) {
-        await updateStock(item.productId, item.quantity)
-      }
-      set((state) => ({ purchases: [...state.purchases, newPurchase], loading: false }))
+      // El API ya incrementa el stock en transacción; solo refrescamos productos
+      const { fetchAllProducts } = useProductStore.getState()
+      await fetchAllProducts()
+      set({ loading: false })
+      await get().fetchPurchases()
     } catch {
       set({ error: 'Error al registrar compra', loading: false })
       throw new Error('Error al registrar compra')

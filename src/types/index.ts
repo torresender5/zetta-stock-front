@@ -63,6 +63,7 @@ export interface Supplier {
 export interface PurchaseItem {
   productId: string
   productName: string
+  size?: string | null
   quantity: number
   unitPrice: number
   subtotal: number
@@ -71,12 +72,32 @@ export interface PurchaseItem {
 export interface Purchase {
   id: string
   supplierId: string
-  supplier: string
+  supplier: Supplier | null
   date: string
   items: PurchaseItem[]
+  subtotal: number
+  tax: number
   total: number
   paymentStatus: 'paid' | 'pending'
   createdAt: string
+}
+
+export interface PurchaseQueryParams {
+  page?: number
+  limit?: number
+  search?: string
+  supplierId?: string
+  paymentStatus?: 'paid' | 'pending' | ''
+  startDate?: string
+  endDate?: string
+}
+
+export interface SupplierQueryParams {
+  page?: number
+  limit?: number
+  search?: string
+  startDate?: string
+  endDate?: string
 }
 
 export interface SaleItem {
@@ -232,4 +253,181 @@ export interface CashRegisterSummary {
   salesByMethod: Partial<Record<PaymentMethod, number>>
   expectedByMethod: Partial<Record<PaymentMethod, number>>
   movementCount: number
+}
+
+export interface ReportFilters {
+  startDate?: string
+  endDate?: string
+  status?: 'paid' | 'pending'
+}
+
+export type ExportFormat = 'xlsx' | 'pdf'
+
+export interface SalesByPeriodRow {
+  date: string
+  count: number
+  subtotal: number
+  tax: number
+  total: number
+}
+
+export interface SalesSummaryReport {
+  startDate: string
+  endDate: string
+  totalSales: number
+  totalCount: number
+  subtotal: number
+  tax: number
+  byPaymentMethod: Partial<Record<PaymentMethod, number>>
+  byPaymentStatus: Partial<Record<'paid' | 'pending' | 'cancelled', number>>
+  byPeriod: SalesByPeriodRow[]
+}
+
+export interface TopProductReportRow {
+  productId: number
+  name: string
+  quantity: number
+  revenue: number
+}
+
+export interface PurchaseBySupplierRow {
+  supplierId: number
+  supplier: string
+  count: number
+  total: number
+}
+
+export interface PurchasesSummaryReport {
+  startDate: string
+  endDate: string
+  totalPurchases: number
+  totalCount: number
+  subtotal: number
+  tax: number
+  byPaymentStatus: Partial<Record<'paid' | 'pending', number>>
+  bySupplier: PurchaseBySupplierRow[]
+}
+
+export interface InventoryReportRow {
+  productId: number
+  name: string
+  code: string
+  category: string
+  stock: number
+  purchasePrice: number
+  stockValue: number
+  lowStock: boolean
+}
+
+export interface InventoryReport {
+  products: InventoryReportRow[]
+  totalItems: number
+  totalStock: number
+  totalStockValue: number
+  lowStockCount: number
+}
+
+export interface CashRegisterReportRow {
+  id: number
+  name: string
+  status: 'open' | 'closed'
+  user: string
+  openedAt: string
+  closedAt: string | null
+  baseAmount: number
+  expectedTotal: number
+  countedTotal: number
+  difference: number
+}
+
+export interface CashRegisterReport {
+  cashRegisters: CashRegisterReportRow[]
+  count: number
+}
+
+export interface AgingReportRow {
+  id: number
+  name: string
+  pendingCount: number
+  total: number
+  current: number
+  days30: number
+  days60: number
+  days90: number
+}
+
+export interface ReceivablesReport {
+  startDate: string
+  endDate: string
+  rows: AgingReportRow[]
+  total: number
+}
+
+export interface PayablesReport {
+  startDate: string
+  endDate: string
+  rows: AgingReportRow[]
+  total: number
+}
+
+export interface ApartadoReportRow {
+  id: number
+  apartadoNumber: string
+  client: string
+  date: string
+  total: number
+  totalPaid: number
+  balance: number
+  status: 'active' | 'paid'
+}
+
+export interface ApartadoReport {
+  rows: ApartadoReportRow[]
+  totalActive: number
+  totalBalance: number
+}
+
+// ----------------------- Planes & Suscripciones -----------------------
+
+export interface Plan {
+  id: number
+  key: string
+  name: string
+  description: string | null
+  features: string[]
+  allowedViews: string[]
+  priceMonthly: number
+  priceYearly: number
+  maxUsers: number
+  trialDays: number | null
+  sortOrder: number
+  active: boolean
+}
+
+export interface Subscription {
+  id: number
+  status: 'active' | 'expired' | string
+  period: 'trial' | 'monthly' | 'yearly' | string
+  price: number
+  startsAt: string
+  trialEndsAt: string | null
+  expiresAt: string | null
+  effectiveEnd: string | null
+  plan: Plan | null
+}
+
+export interface PaymentOrder {
+  id: number
+  planKey: string
+  period: string
+  amount: number
+  concept: string
+  status: 'pending' | 'paid' | 'rejected' | string
+  paidAt: string | null
+  createdAt: string
+}
+
+export interface MySubscriptionResponse {
+  subscription: Subscription | null
+  paymentOrders: PaymentOrder[]
 }

@@ -128,11 +128,10 @@ export const useSaleStore = create<SaleStore>()((set, get) => ({
         paymentMethod,
         receivedAmount,
       })
-      // Reducir stock local
-      const { updateStock } = useProductStore.getState()
-      for (const item of items) {
-        await updateStock(item.productId, -item.quantity, item.size)
-      }
+      // El API ya descuenta el stock en transacción (incluye tallas);
+      // solo refrescamos productos para reflejar el stock actualizado
+      const { fetchAllProducts } = useProductStore.getState()
+      await fetchAllProducts()
       set((state) => ({
         sales: [...state.sales, toSale(sale)],
         invoices: [...state.invoices, toInvoice(invoice)],
