@@ -27,6 +27,10 @@ import Register from './pages/Register'
 import Plans from './pages/Plans'
 import Subscription from './pages/Subscription'
 import AdminLogin from './pages/AdminLogin'
+import AdminDashboard from './pages/AdminDashboard'
+import AdminCompanies from './pages/AdminCompanies'
+import AdminUsers from './pages/AdminUsers'
+import AdminBusiness from './pages/AdminBusiness'
 import AdminPlans from './pages/AdminPlans'
 import AdminOrders from './pages/AdminOrders'
 import AdminSubscriptions from './pages/AdminSubscriptions'
@@ -51,10 +55,14 @@ export default function App() {
           </AdminRoute>
         }
       >
-        <Route path="/admin" element={<Navigate to="/admin/planes" replace />} />
+        <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/admin/empresas" element={<AdminCompanies />} />
         <Route path="/admin/planes" element={<AdminPlans />} />
         <Route path="/admin/ordenes" element={<AdminOrders />} />
         <Route path="/admin/suscripciones" element={<AdminSubscriptions />} />
+        <Route path="/admin/usuarios" element={<AdminUsers />} />
+        <Route path="/admin/negocio" element={<AdminBusiness />} />
       </Route>
       <Route element={
         <ProtectedRoute>

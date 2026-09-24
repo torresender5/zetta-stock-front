@@ -431,3 +431,143 @@ export interface MySubscriptionResponse {
   subscription: Subscription | null
   paymentOrders: PaymentOrder[]
 }
+
+// ----------------------- Superadmin -----------------------
+
+export interface AdminPlanDistribution {
+  id: number
+  key: string
+  name: string
+  companies: number
+}
+
+export interface AdminTopCompany {
+  id: number
+  name: string
+  total: number
+  count: number
+}
+
+export interface AdminRegistrationMonth {
+  month: string
+  count: number
+}
+
+export interface AdminDashboardData {
+  companies: { total: number; active: number; inactive: number; newLast30Days: number }
+  users: { total: number }
+  subscriptions: {
+    active: number
+    expired: number
+    trial: number
+    paidMonthly: number
+    paidYearly: number
+    expiringSoon: number
+  }
+  mrv: number
+  pendingOrders: number
+  monthSales: { total: number; count: number }
+  monthPurchases: { total: number; count: number }
+  plans: AdminPlanDistribution[]
+  topCompanies: AdminTopCompany[]
+  registrationsByMonth: AdminRegistrationMonth[]
+}
+
+export interface AdminCompany {
+  id: number
+  name: string
+  kind: string
+  document: string | null
+  phoneNumber: string | null
+  address: string | null
+  active: boolean
+  createdAt: string
+  usersCount: number
+  salesCount: number
+  productsCount: number
+  lastSaleAt: string | null
+  lastSaleTotal: number | null
+  plan: { key: string; name: string } | null
+  subscriptionStatus: string | null
+  period: string | null
+}
+
+export interface AdminCompanyUser {
+  id: number
+  name: string
+  email: string
+  role: string
+  active: boolean
+  createdAt: string
+}
+
+export interface AdminCompanyDetail {
+  id: number
+  name: string
+  kind: string
+  document: string | null
+  phoneNumber: string | null
+  address: string | null
+  active: boolean
+  createdAt: string
+  users: AdminCompanyUser[]
+  subscription: {
+    id: number
+    status: string
+    period: string
+    price: number
+    plan: Plan | null
+  } | null
+  lastSales: {
+    id: number
+    date: string
+    total: number
+    paymentStatus: string
+    clientName: string
+  }[]
+  _count: { sales: number; products: number; clients: number; suppliers: number; purchases: number }
+}
+
+export interface AdminUser {
+  id: number
+  name: string
+  email: string
+  role: string
+  active: boolean
+  createdAt: string
+  companyId: number | null
+  companyName: string | null
+  companyActive: boolean | null
+}
+
+export interface AdminTopProduct {
+  productId: number
+  name: string
+  quantity: number
+  revenue: number
+}
+
+export interface AdminLowStock {
+  id: number
+  name: string
+  code: string
+  stock: number
+  companyName: string
+}
+
+export interface AdminPortfolioRow {
+  companyId: number
+  name: string
+  total: number
+  count: number
+}
+
+export interface AdminBusinessData {
+  sales: { total: number; count: number }
+  purchases: { total: number; count: number }
+  byMethod: Record<string, number>
+  topProducts: AdminTopProduct[]
+  lowStock: AdminLowStock[]
+  receivables: AdminPortfolioRow[]
+  payables: AdminPortfolioRow[]
+}

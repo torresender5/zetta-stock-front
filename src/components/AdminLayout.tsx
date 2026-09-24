@@ -1,12 +1,25 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { CreditCard, LayoutDashboard, ListOrdered, LogOut, ShieldAlert } from 'lucide-react'
+import {
+  BarChart3,
+  Building2,
+  CreditCard,
+  LayoutDashboard,
+  ListOrdered,
+  LogOut,
+  ShieldAlert,
+  Users,
+} from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { clearAdminSession } from '../lib/adminAuth'
 
 const links = [
-  { to: '/admin/planes', label: 'Planes', icon: LayoutDashboard },
+  { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/admin/empresas', label: 'Empresas', icon: Building2 },
+  { to: '/admin/usuarios', label: 'Usuarios', icon: Users },
+  { to: '/admin/planes', label: 'Planes', icon: CreditCard },
   { to: '/admin/ordenes', label: 'Órdenes de pago', icon: ListOrdered },
-  { to: '/admin/suscripciones', label: 'Suscripciones', icon: CreditCard },
+  { to: '/admin/suscripciones', label: 'Suscripciones', icon: ShieldAlert },
+  { to: '/admin/negocio', label: 'Negocio', icon: BarChart3 },
 ]
 
 export default function AdminLayout() {
