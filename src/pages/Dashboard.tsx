@@ -94,7 +94,7 @@ const kpiModule: Record<(typeof kpiConfig)[number]['key'], ModuleKey> = {
 export default function Dashboard() {
   const role = useAuthStore((s) => s.user?.role)
   const { products, fetchAllProducts } = useProductStore()
-  const { clients, fetchClients } = useClientStore()
+  const { allClients, fetchClients } = useClientStore()
   const { purchases, fetchPurchases } = usePurchaseStore()
   const { sales, invoices, fetchSales, fetchInvoices } = useSaleStore()
   const { active: activeCaja, summary: cajaSummary, fetchActive: fetchActiveCaja } = useCajaStore()
@@ -177,7 +177,7 @@ export default function Dashboard() {
 
   const kpiValues: Record<string, string | number> = {
     products: products.length,
-    clients: clients.length,
+    clients: allClients.length,
     purchases: formatCurrency(totalPurchases),
     sales: formatCurrency(totalSales),
     invoices: pendingInvoices,

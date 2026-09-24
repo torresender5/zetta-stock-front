@@ -22,7 +22,7 @@ interface CartPanelProps {
 
 export default function CartPanel({ isOpen, onClose }: CartPanelProps) {
   const { items, removeItem, updateQuantity, clear } = useCartStore()
-  const { clients, fetchClients } = useClientStore()
+  const { allClients, fetchClients } = useClientStore()
   const { addSale } = useSaleStore()
   const navigate = useNavigate()
 
@@ -31,7 +31,7 @@ export default function CartPanel({ isOpen, onClose }: CartPanelProps) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
 
   useEffect(() => {
-    if (isOpen && clients.length === 0) {
+    if (isOpen && allClients.length === 0) {
       fetchClients()
     }
   }, [isOpen])

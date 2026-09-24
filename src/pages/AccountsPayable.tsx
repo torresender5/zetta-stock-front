@@ -1,94 +1,267 @@
-import { useMemo, useEffect } from 'react'
-import { CheckCircle } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Search, Calendar, XCircle, Eye, CheckCircle, HandCoins } from 'lucide-react'
 import { usePurchaseStore } from '../stores/purchaseStore'
+import { purchaseService } from '../services/purchaseService'
 import { formatCurrency, formatDateOnly } from '../lib/utils'
+import DataTable from '../components/DataTable'
+import ActionDropdown from '../components/ActionDropdown'
+import type { Column } from '../components/DataTable/types'
+import type { Purchase, PaginationMeta } from '../types'
+
+const columns: Column<Purchase>[] = [
+  {
+    key: 'purchaseNumber',
+    header: 'N° Compra',
+    width: '8rem',
+    render: (p) =>
+      p.purchaseNumber ? (
+        <span className="font-mono font-medium text-blue-600">{p.purchaseNumber}</span>
+      ) : (
+        <span className="text-gray-300">—</span>
+      ),
+  },
+  {
+    key: 'supplier',
+    header: 'Proveedor',
+    cellClassName: 'font-medium text-gray-900',
+    truncate: true,
+    render: (p) => p.supplier?.name ?? 'Sin proveedor',
+  },
+  {
+    key: 'date',
+    header: 'Fecha',
+    hideBelow: 'sm',
+    cellClassName: 'text-gray-500',
+    render: (p) => formatDateOnly(p.date),
+  },
+  {
+    key: 'items',
+    header: 'Productos',
+    align: 'right',
+    hideBelow: 'md',
+    render: (p) => p.items.length,
+  },
+  {
+    key: 'subtotal',
+    header: 'Subtotal',
+    align: 'right',
+    hideBelow: 'lg',
+    render: (p) => formatCurrency(p.subtotal),
+  },
+  {
+    key: 'total',
+    header: 'Total',
+    align: 'right',
+    width: '6.5rem',
+    cellClassName: 'font-medium',
+    render: (p) => formatCurrency(p.total),
+  },
+]
 
 export default function AccountsPayable() {
-  const { purchases, fetchPurchases, updatePurchasePaymentStatus } = usePurchaseStore()
+  const updatePurchasePaymentStatus = usePurchaseStore(
+    (s) => s.updatePurchasePaymentStatus,
+  )
+  const navigate = useNavigate()
+
+  const [rows, setRows] = useState<Purchase[]>([])
+  const [meta, setMeta] = useState<PaginationMeta>({
+    total: 0,
+    page: 1,
+    limit: 10,
+    totalPages: 1,
+  })
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
+  const [searchInput, setSearchInput] = useState('')
+  const [search, setSearch] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [pendingTotal, setPendingTotal] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    fetchPurchases()
+    loadTable()
+  }, [page, limit, search, startDate, endDate])
+
+  useEffect(() => {
+    loadTotal()
   }, [])
 
-  const pendingPurchases = useMemo(
-    () => purchases.filter((p) => (p.paymentStatus ?? 'paid') === 'pending'),
-    [purchases]
-  )
-
-  const groupedBySupplier = useMemo(() => {
-    const map: Record<string, { supplier: string; total: number; purchases: typeof pendingPurchases }> = {}
-    for (const p of pendingPurchases) {
-      const supplierName = p.supplier?.name ?? 'Sin proveedor'
-      if (!map[supplierName]) {
-        map[supplierName] = { supplier: supplierName, total: 0, purchases: [] }
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (searchInput !== search) {
+        setSearch(searchInput)
+        setPage(1)
       }
-      map[supplierName].total += p.total
-      map[supplierName].purchases.push(p)
-    }
-    return Object.values(map).sort((a, b) => b.total - a.total)
-  }, [pendingPurchases])
+    }, 400)
+    return () => clearTimeout(t)
+  }, [searchInput])
 
-  const totalDebt = pendingPurchases.reduce((sum, p) => sum + p.total, 0)
+  const loadTable = async () => {
+    setLoading(true)
+    setError(null)
+    try {
+      const { data, meta: resultMeta } = await purchaseService.getAll({
+        page,
+        limit,
+        search: search || undefined,
+        paymentStatus: 'pending',
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+      })
+      setRows(data)
+      setMeta(resultMeta)
+    } catch {
+      setError('Error al cargar cuentas por pagar')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const loadTotal = async () => {
+    let total = 0
+    let currentPage = 1
+    let totalPages = 1
+    do {
+      try {
+        const { data, meta: resultMeta } = await purchaseService.getAll({
+          page: currentPage,
+          limit: 100,
+          paymentStatus: 'pending',
+        })
+        total += data.reduce((sum, p) => sum + p.total, 0)
+        totalPages = resultMeta.totalPages
+        currentPage += 1
+      } catch {
+        return
+      }
+    } while (currentPage <= totalPages)
+    setPendingTotal(total)
+  }
+
+  const markAsPaid = async (id: string) => {
+    try {
+      await updatePurchasePaymentStatus(id, 'paid')
+      await loadTable()
+      await loadTotal()
+    } catch {
+      // El error ya se registra en el store
+    }
+  }
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Cuentas por Pagar</h1>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Cuentas por Pagar</h1>
+          <p className="text-sm text-gray-500 mt-1">{meta.total} compra(s) pendiente(s)</p>
+        </div>
         <div className="text-right">
           <p className="text-sm text-gray-500">Total adeudado</p>
-          <p className="text-2xl font-bold text-orange-600">{formatCurrency(totalDebt)}</p>
+          <p className="text-2xl font-bold text-orange-600">{formatCurrency(pendingTotal)}</p>
         </div>
       </div>
 
-      {groupedBySupplier.length === 0 ? (
-        <div className="bg-white rounded-2xl shadow-sm p-8 text-center text-gray-500">
-          No hay cuentas por pagar pendientes.
+      <div className="flex flex-col sm:flex-row gap-3 mb-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar por proveedor o producto..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-white border-0 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm transition-all"
+          />
         </div>
-      ) : (
-        <div className="space-y-4">
-          {groupedBySupplier.map(({ supplier, total, purchases: supplierPurchases }) => (
-            <div key={supplier} className="bg-white rounded-2xl shadow-sm overflow-hidden">
-              <div className="flex items-center justify-between p-4 bg-orange-50/80">
-                <div>
-                  <h2 className="font-semibold text-lg">{supplier}</h2>
-                  <p className="text-sm text-gray-500">{supplierPurchases.length} compra(s) pendiente(s)</p>
-                </div>
-                <span className="text-lg font-bold text-orange-700">{formatCurrency(total)}</span>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm min-w-[500px]">
-                  <thead className="bg-gray-50/80">
-                    <tr>
-                      <th className="text-left px-6 py-4 font-semibold text-gray-600 text-xs uppercase tracking-wider">Fecha</th>
-                      <th className="text-right px-6 py-4 font-semibold text-gray-600 text-xs uppercase tracking-wider">Productos</th>
-                      <th className="text-right px-6 py-4 font-semibold text-gray-600 text-xs uppercase tracking-wider">Total</th>
-                      <th className="text-center px-6 py-4 font-semibold text-gray-600 text-xs uppercase tracking-wider">Acción</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {supplierPurchases.map((p) => (
-                      <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
-                        <td className="px-6 py-4">{formatDateOnly(p.date)}</td>
-                        <td className="px-6 py-4 text-right">{p.items.length}</td>
-                        <td className="px-6 py-4 text-right font-medium">{formatCurrency(p.total)}</td>
-                        <td className="px-6 py-4 text-center">
-                          <button
-                            onClick={() => updatePurchasePaymentStatus(p.id, 'paid')}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium bg-green-100 text-green-700 rounded-xl hover:bg-green-200 transition-colors"
-                          >
-                            <CheckCircle className="w-3.5 h-3.5" />
-                            Marcar pagado
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ))}
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-gray-400" />
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => {
+              setStartDate(e.target.value)
+              setPage(1)
+            }}
+            placeholder="Fecha inicio"
+            className="bg-white border-0 rounded-xl px-4 py-2.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm transition-all"
+          />
+          <span className="text-gray-400 text-sm">hasta</span>
+          <input
+            type="date"
+            value={endDate}
+            onChange={(e) => {
+              setEndDate(e.target.value)
+              setPage(1)
+            }}
+            placeholder="Fecha fin"
+            className="bg-white border-0 rounded-xl px-4 py-2.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm transition-all"
+          />
+        </div>
+        {(startDate || endDate) && (
+          <button
+            onClick={() => {
+              setStartDate('')
+              setEndDate('')
+              setPage(1)
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
+          >
+            <XCircle className="w-4 h-4" />
+            Limpiar fechas
+          </button>
+        )}
+      </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-600 rounded-2xl text-sm">
+          {error}
         </div>
       )}
+
+      <DataTable
+        columns={columns}
+        data={rows}
+        getRowKey={(p) => p.id}
+        loading={loading && rows.length === 0}
+        emptyIcon={<HandCoins className="w-10 h-10 mx-auto mb-3 opacity-40" />}
+        emptyMessage="No hay cuentas por pagar pendientes"
+        pagination={{
+          page,
+          limit,
+          total: meta.total,
+          totalPages: meta.totalPages,
+          onPageChange: setPage,
+          onLimitChange: (l) => {
+            setLimit(l)
+            setPage(1)
+          },
+        }}
+        actions={(p) => (
+          <div className="flex justify-end gap-1">
+            <ActionDropdown
+              actions={[
+                {
+                  label: 'Ver detalle',
+                  icon: <Eye className="w-4 h-4" />,
+                  onClick: () => navigate(`/purchases/${p.id}`),
+                },
+                {
+                  label: 'Marcar pagado',
+                  icon: <CheckCircle className="w-4 h-4" />,
+                  className: 'text-green-600',
+                  onClick: () => markAsPaid(p.id),
+                },
+              ]}
+            />
+          </div>
+        )}
+      />
     </div>
   )
 }

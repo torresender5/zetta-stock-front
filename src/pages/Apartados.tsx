@@ -9,6 +9,8 @@ import {
   XCircle,
   Info,
   HandCoins,
+  Search,
+  Calendar,
 } from 'lucide-react'
 import { useProductStore } from '../stores/productStore'
 import { useClientStore } from '../stores/clientStore'
@@ -141,15 +143,23 @@ export default function Apartados() {
     page,
     limit,
     statusFilter,
+    search,
+    startDateFilter,
+    endDateFilter,
     loading,
     error,
     fetchApartados,
     setPage,
+    setLimit,
     setStatusFilter,
+    setSearch,
+    setStartDateFilter,
+    setEndDateFilter,
     createApartado,
   } = useApartadoStore()
   const navigate = useNavigate()
 
+  const [searchInput, setSearchInput] = useState(search)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [clientId, setClientId] = useState('')
   const [date, setDate] = useState(todayLocal())
@@ -170,6 +180,13 @@ export default function Apartados() {
     fetchClients()
     fetchApartados()
   }, [])
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (searchInput !== search) setSearch(searchInput)
+    }, 400)
+    return () => clearTimeout(t)
+  }, [searchInput])
 
   const selectedProduct: Product | null =
     products.find((p) => p.id === draftProductId) ?? null
@@ -310,20 +327,61 @@ export default function Apartados() {
         </button>
       </div>
 
-      <div className="flex flex-wrap gap-2 mb-4">
-        {FILTERS.map((f) => (
+      <div className="flex flex-col sm:flex-row gap-3 mb-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Buscar por número de apartado o cliente..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-white border-0 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm transition-all"
+          />
+        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value as '' | Apartado['status'])}
+          className="bg-white border-0 rounded-xl px-4 py-2.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm transition-all"
+        >
+          {FILTERS.map((f) => (
+            <option key={f.value || 'all'} value={f.value}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3 mb-6">
+        <div className="flex items-center gap-2">
+          <Calendar className="w-4 h-4 text-gray-400" />
+          <input
+            type="date"
+            value={startDateFilter}
+            onChange={(e) => setStartDateFilter(e.target.value)}
+            placeholder="Fecha inicio"
+            className="bg-white border-0 rounded-xl px-4 py-2.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm transition-all"
+          />
+          <span className="text-gray-400 text-sm">hasta</span>
+          <input
+            type="date"
+            value={endDateFilter}
+            onChange={(e) => setEndDateFilter(e.target.value)}
+            placeholder="Fecha fin"
+            className="bg-white border-0 rounded-xl px-4 py-2.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm transition-all"
+          />
+        </div>
+        {(startDateFilter || endDateFilter) && (
           <button
-            key={f.value || 'all'}
-            onClick={() => setStatusFilter(f.value)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
-              statusFilter === f.value
-                ? 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-500/25'
-                : 'bg-card border border-border text-gray-600 hover:bg-gray-50'
-            }`}
+            onClick={() => {
+              setStartDateFilter('')
+              setEndDateFilter('')
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-colors"
           >
-            {f.label}
+            <XCircle className="w-4 h-4" />
+            Limpiar fechas
           </button>
-        ))}
+        )}
       </div>
 
       {error && (
@@ -347,7 +405,7 @@ export default function Apartados() {
           total: meta.total,
           totalPages: meta.totalPages,
           onPageChange: setPage,
-          onLimitChange: () => {},
+          onLimitChange: setLimit,
         }}
         actions={(a) => (
           <div className="flex justify-end gap-1">

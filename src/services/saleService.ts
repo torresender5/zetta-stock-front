@@ -5,6 +5,7 @@ import type {
   Invoice,
   PaymentMethod,
   PaginatedResponse,
+  SaleQueryParams,
 } from '../types'
 
 export interface CreateSaleDto {
@@ -44,7 +45,7 @@ export const saleService = {
     return all
   },
 
-  getPage: async (params: { page: number; limit: number }): Promise<PaginatedResponse<Sale>> => {
+  getPage: async (params: SaleQueryParams): Promise<PaginatedResponse<Sale>> => {
     const { data } = await api.get<PaginatedResponse<Sale>>('/sales', { params })
     return data
   },

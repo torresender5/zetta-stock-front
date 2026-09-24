@@ -21,6 +21,10 @@ interface SaleStore {
   salesMeta: PaginationMeta
   page: number
   limit: number
+  search: string
+  paymentStatusFilter: '' | 'paid' | 'pending' | 'cancelled'
+  startDateFilter: string
+  endDateFilter: string
   invoices: Invoice[]
   sale: Sale | null
   loading: boolean
@@ -30,6 +34,10 @@ interface SaleStore {
   fetchSaleById: (id: string) => Promise<void>
   setPage: (page: number) => void
   setLimit: (limit: number) => void
+  setSearch: (search: string) => void
+  setPaymentStatusFilter: (status: '' | 'paid' | 'pending' | 'cancelled') => void
+  setStartDateFilter: (date: string) => void
+  setEndDateFilter: (date: string) => void
   fetchInvoices: () => Promise<void>
   addSale: (
     clientId: string,
@@ -56,6 +64,10 @@ export const useSaleStore = create<SaleStore>()((set, get) => ({
   salesMeta: emptyMeta,
   page: 1,
   limit: 10,
+  search: '',
+  paymentStatusFilter: '',
+  startDateFilter: '',
+  endDateFilter: '',
   invoices: [],
   sale: null,
   loading: false,
@@ -72,10 +84,17 @@ export const useSaleStore = create<SaleStore>()((set, get) => ({
   },
 
   fetchSalesPage: async () => {
-    const { page, limit } = get()
+    const { page, limit, search, paymentStatusFilter, startDateFilter, endDateFilter } = get()
     set({ loading: true, error: null })
     try {
-      const { data, meta } = await saleService.getPage({ page, limit })
+      const { data, meta } = await saleService.getPage({
+        page,
+        limit,
+        search: search || undefined,
+        paymentStatus: paymentStatusFilter || undefined,
+        startDate: startDateFilter || undefined,
+        endDate: endDateFilter || undefined,
+      })
       set({ salesList: data.map(toSale), salesMeta: meta, loading: false })
     } catch {
       set({ error: 'Error al cargar ventas', loading: false })
@@ -104,6 +123,26 @@ export const useSaleStore = create<SaleStore>()((set, get) => ({
 
   setLimit: (limit) => {
     set({ limit, page: 1 })
+    get().fetchSalesPage()
+  },
+
+  setSearch: (search) => {
+    set({ search, page: 1 })
+    get().fetchSalesPage()
+  },
+
+  setPaymentStatusFilter: (paymentStatusFilter) => {
+    set({ paymentStatusFilter, page: 1 })
+    get().fetchSalesPage()
+  },
+
+  setStartDateFilter: (startDateFilter) => {
+    set({ startDateFilter, page: 1 })
+    get().fetchSalesPage()
+  },
+
+  setEndDateFilter: (endDateFilter) => {
+    set({ endDateFilter, page: 1 })
     get().fetchSalesPage()
   },
 

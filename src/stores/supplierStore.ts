@@ -22,7 +22,7 @@ interface SupplierStore {
   setSearch: (search: string) => void
   setStartDateFilter: (date: string) => void
   setEndDateFilter: (date: string) => void
-  addSupplier: (supplier: CreateSupplierDto) => Promise<void>
+  addSupplier: (supplier: CreateSupplierDto) => Promise<Supplier>
   updateSupplier: (id: string, supplier: Partial<Supplier>) => Promise<void>
   deleteSupplier: (id: string) => Promise<void>
 }
@@ -100,6 +100,7 @@ export const useSupplierStore = create<SupplierStore>()((set, get) => ({
         allSuppliers: [...state.allSuppliers, newSupplier],
         loading: false,
       }))
+      return newSupplier
     } catch {
       set({ error: 'Error al crear proveedor', loading: false })
       throw new Error('Error al crear proveedor')

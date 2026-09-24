@@ -14,6 +14,11 @@ export const purchaseService = {
     return data
   },
 
+  getById: async (id: string): Promise<Purchase> => {
+    const { data } = await api.get<Purchase>(`/purchases/${id}`)
+    return data
+  },
+
   create: async (purchase: CreatePurchaseDto): Promise<Purchase> => {
     const { data } = await api.post<Purchase>('/purchases', purchase)
     return data

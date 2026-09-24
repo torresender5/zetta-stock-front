@@ -71,6 +71,7 @@ export interface PurchaseItem {
 
 export interface Purchase {
   id: string
+  purchaseNumber?: string | null
   supplierId: string
   supplier: Supplier | null
   date: string
@@ -92,10 +93,36 @@ export interface PurchaseQueryParams {
   endDate?: string
 }
 
+export interface ApartadoQueryParams {
+  page?: number
+  limit?: number
+  status?: ApartadoStatus | ''
+  search?: string
+  startDate?: string
+  endDate?: string
+}
+
 export interface SupplierQueryParams {
   page?: number
   limit?: number
   search?: string
+  startDate?: string
+  endDate?: string
+}
+
+export interface ClientQueryParams {
+  page?: number
+  limit?: number
+  search?: string
+  startDate?: string
+  endDate?: string
+}
+
+export interface SaleQueryParams {
+  page?: number
+  limit?: number
+  search?: string
+  paymentStatus?: 'paid' | 'pending' | 'cancelled' | ''
   startDate?: string
   endDate?: string
 }

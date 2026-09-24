@@ -1,11 +1,22 @@
 import api from '../lib/api'
-import type { Client } from '../types'
+import type { Client, PaginatedResponse, ClientQueryParams } from '../types'
 
 export type CreateClientDto = Omit<Client, 'id' | 'createdAt'>
 
 export const clientService = {
+  // Lista completa (sin paginar) para dropdowns del modal de venta
   getAll: async (): Promise<Client[]> => {
-    const { data } = await api.get<Client[]>('/client')
+    const { data } = await api.get<Client[]>('/client/all')
+    return data
+  },
+
+  // Lista paginada y filtrable para la tabla de clientes
+  getPage: async (
+    params: ClientQueryParams = {}
+  ): Promise<PaginatedResponse<Client>> => {
+    const { data } = await api.get<PaginatedResponse<Client>>('/client', {
+      params,
+    })
     return data
   },
 
@@ -25,6 +36,6 @@ export const clientService = {
   },
 
   delete: async (id: string): Promise<void> => {
-    await api.delete(`/clients/${id}`)
+    await api.delete(`/client/${id}`)
   },
 }

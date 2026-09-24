@@ -7,6 +7,7 @@ const emptyMeta: PaginationMeta = { total: 0, page: 1, limit: 10, totalPages: 1 
 
 interface PurchaseStore {
   purchases: Purchase[]
+  purchase: Purchase | null
   meta: PaginationMeta
   loading: boolean
   error: string | null
@@ -18,6 +19,7 @@ interface PurchaseStore {
   startDateFilter: string
   endDateFilter: string
   fetchPurchases: () => Promise<void>
+  fetchPurchaseById: (id: string) => Promise<void>
   setPage: (page: number) => void
   setLimit: (limit: number) => void
   setSearch: (search: string) => void
@@ -31,6 +33,7 @@ interface PurchaseStore {
 
 export const usePurchaseStore = create<PurchaseStore>()((set, get) => ({
   purchases: [],
+  purchase: null,
   meta: emptyMeta,
   loading: false,
   error: null,
@@ -58,6 +61,21 @@ export const usePurchaseStore = create<PurchaseStore>()((set, get) => ({
       set({ purchases: data, meta, loading: false })
     } catch {
       set({ error: 'Error al cargar compras', loading: false })
+    }
+  },
+
+  fetchPurchaseById: async (id: string) => {
+    set({ loading: true, error: null, purchase: null })
+    try {
+      const purchase = await purchaseService.getById(id)
+      set({ purchase, loading: false })
+    } catch (error) {
+      const message =
+        (error as { response?: { status?: number } })?.response?.status === 404
+          ? 'La compra no existe o no tienes acceso a ella.'
+          : 'Error al cargar la compra'
+      set({ error: message, loading: false })
+      throw error
     }
   },
 

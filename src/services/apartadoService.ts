@@ -56,6 +56,9 @@ export interface ListApartadosParams {
   status?: ApartadoStatus
   page?: number
   limit?: number
+  search?: string
+  startDate?: string
+  endDate?: string
 }
 
 export const apartadoService = {

@@ -19,13 +19,20 @@ interface ApartadoStore {
   page: number
   limit: number
   statusFilter: ApartadoStatus | ''
+  search: string
+  startDateFilter: string
+  endDateFilter: string
   apartado: Apartado | null
   loading: boolean
   error: string | null
   fetchApartados: () => Promise<void>
   fetchApartadoById: (id: string) => Promise<void>
   setPage: (page: number) => void
+  setLimit: (limit: number) => void
   setStatusFilter: (status: ApartadoStatus | '') => void
+  setSearch: (search: string) => void
+  setStartDateFilter: (date: string) => void
+  setEndDateFilter: (date: string) => void
   createApartado: (
     data: CreateApartadoDto,
   ) => Promise<{ ok: boolean; error?: string; apartado?: Apartado }>
@@ -51,18 +58,31 @@ export const useApartadoStore = create<ApartadoStore>()((set, get) => ({
   page: 1,
   limit: 10,
   statusFilter: '',
+  search: '',
+  startDateFilter: '',
+  endDateFilter: '',
   apartado: null,
   loading: false,
   error: null,
 
   fetchApartados: async () => {
-    const { page, limit, statusFilter } = get()
+    const {
+      page,
+      limit,
+      statusFilter,
+      search,
+      startDateFilter,
+      endDateFilter,
+    } = get()
     set({ loading: true, error: null })
     try {
       const { data, meta } = await apartadoService.getPage({
         page,
         limit,
         status: statusFilter || undefined,
+        search: search || undefined,
+        startDate: startDateFilter || undefined,
+        endDate: endDateFilter || undefined,
       })
       set({ apartados: data, meta, loading: false })
     } catch {
@@ -90,8 +110,28 @@ export const useApartadoStore = create<ApartadoStore>()((set, get) => ({
     get().fetchApartados()
   },
 
+  setLimit: (limit) => {
+    set({ limit, page: 1 })
+    get().fetchApartados()
+  },
+
   setStatusFilter: (statusFilter) => {
     set({ statusFilter, page: 1 })
+    get().fetchApartados()
+  },
+
+  setSearch: (search) => {
+    set({ search, page: 1 })
+    get().fetchApartados()
+  },
+
+  setStartDateFilter: (startDateFilter) => {
+    set({ startDateFilter, page: 1 })
+    get().fetchApartados()
+  },
+
+  setEndDateFilter: (endDateFilter) => {
+    set({ endDateFilter, page: 1 })
     get().fetchApartados()
   },
 

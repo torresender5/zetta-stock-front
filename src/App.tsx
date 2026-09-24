@@ -12,6 +12,7 @@ import Products from './pages/Products'
 import Clients from './pages/Clients'
 import Suppliers from './pages/Suppliers'
 import Purchases from './pages/Purchases'
+import PurchaseDetails from './pages/PurchaseDetails'
 import Sales from './pages/Sales'
 import SaleDetails from './pages/SaleDetails'
 import Apartados from './pages/Apartados'
@@ -76,6 +77,7 @@ export default function App() {
         <Route path="/clients" element={<RequireRole view="clients"><Clients /></RequireRole>} />
         <Route path="/suppliers" element={<RequireRole view="suppliers"><Suppliers /></RequireRole>} />
         <Route path="/purchases" element={<RequireRole view="purchases"><Purchases /></RequireRole>} />
+        <Route path="/purchases/:id" element={<RequireRole view="purchases"><PurchaseDetails /></RequireRole>} />
         <Route path="/sales" element={<RequireRole view="sales"><Sales /></RequireRole>} />
         <Route path="/sales/:id" element={<RequireRole view="sales"><SaleDetails /></RequireRole>} />
         <Route path="/apartados" element={<RequireRole view="apartados"><Apartados /></RequireRole>} />

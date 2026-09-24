@@ -1,38 +1,43 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Search, Plus, X, ChevronDown, Loader2 } from 'lucide-react'
-import { useClientStore } from '../stores/clientStore'
-import { ClientForm } from './ClientForm'
+import { useSupplierStore } from '../stores/supplierStore'
 import Modal from './Modal'
-import type { Client } from '../types'
+import type { Supplier } from '../types'
 
-interface ClientSelectProps {
+interface SupplierSelectProps {
   value: string
-  onChange: (clientId: string) => void
+  onChange: (supplierId: string) => void
 }
 
-export function ClientSelect({ value, onChange }: ClientSelectProps) {
-  const { clients, allClients, loading, addClient, error } = useClientStore()
+const emptyForm = { name: '', document: '', email: '', phone: '', address: '' }
+
+export function SupplierSelect({ value, onChange }: SupplierSelectProps) {
+  const { allSuppliers, loading, addSupplier, error } = useSupplierStore()
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(-1)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [form, setForm] = useState(emptyForm)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const selectedClient = useMemo(() => allClients.find((c) => c.id === value) ?? null, [allClients, value])
+  const selectedSupplier = useMemo(
+    () => allSuppliers.find((s) => s.id === value) ?? null,
+    [allSuppliers, value]
+  )
 
   const trimmed = query.trim().toLowerCase()
   const filtered = useMemo(() => {
-    if (!trimmed) return allClients
-    return allClients.filter(
-      (c) => c.name.toLowerCase().includes(trimmed) || c.document.toLowerCase().includes(trimmed)
+    if (!trimmed) return allSuppliers
+    return allSuppliers.filter(
+      (s) => s.name.toLowerCase().includes(trimmed) || s.document.toLowerCase().includes(trimmed)
     )
-  }, [allClients, trimmed])
+  }, [allSuppliers, trimmed])
 
   const showCreate = trimmed.length > 0 && filtered.length === 0
   const totalOptions = filtered.length + (showCreate ? 1 : 0)
-  const inputValue = open ? query : selectedClient?.name ?? ''
+  const inputValue = open ? query : selectedSupplier?.name ?? ''
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -45,30 +50,39 @@ export function ClientSelect({ value, onChange }: ClientSelectProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const selectClient = (client: Client) => {
-    onChange(client.id)
-    setQuery(client.name)
+  const selectSupplier = (supplier: Supplier) => {
+    onChange(supplier.id)
+    setQuery(supplier.name)
     setActiveIndex(-1)
     setOpen(false)
   }
 
   const openCreate = () => {
+    setForm(emptyForm)
     setCreateError(null)
     setIsCreateOpen(true)
   }
 
-  const handleCreate = async (form: { name: string; document: string; email: string; phone: string; address: string }) => {
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!form.name.trim() || !form.document.trim()) return
     setCreating(true)
     setCreateError(null)
     try {
-      const newClient = await addClient(form)
-      onChange(newClient.id)
-      setQuery(newClient.name)
+      const newSupplier = await addSupplier({
+        name: form.name.trim(),
+        document: form.document.trim(),
+        email: form.email.trim(),
+        phone: form.phone.trim(),
+        address: form.address.trim(),
+      })
+      onChange(newSupplier.id)
+      setQuery(newSupplier.name)
       setActiveIndex(-1)
       setOpen(false)
       setIsCreateOpen(false)
     } catch {
-      setCreateError(error ?? 'Error al crear cliente')
+      setCreateError(error ?? 'Error al crear proveedor')
     } finally {
       setCreating(false)
     }
@@ -100,7 +114,7 @@ export function ClientSelect({ value, onChange }: ClientSelectProps) {
         if (open && activeIndex >= 0) {
           e.preventDefault()
           if (activeIndex < filtered.length) {
-            selectClient(filtered[activeIndex])
+            selectSupplier(filtered[activeIndex])
           } else if (showCreate) {
             openCreate()
           }
@@ -128,16 +142,13 @@ export function ClientSelect({ value, onChange }: ClientSelectProps) {
           role="combobox"
           aria-expanded={open}
           aria-autocomplete="list"
-          aria-label="Seleccionar cliente"
+          aria-label="Seleccionar proveedor"
           type="text"
           value={inputValue}
-          placeholder="Buscar o seleccionar cliente..."
+          placeholder="Buscar o seleccionar proveedor..."
           onFocus={() => {
             setOpen(true)
-            setQuery(selectedClient?.name ?? '')
-          }}
-          onBlur={(e) => {
-            if (containerRef.current?.contains(e.relatedTarget as Node)) return
+            setQuery(selectedSupplier?.name ?? '')
           }}
           onChange={(e) => {
             setQuery(e.target.value)
@@ -147,7 +158,7 @@ export function ClientSelect({ value, onChange }: ClientSelectProps) {
           onKeyDown={handleKeyDown}
           className="w-full pl-10 pr-9 py-2.5 border border-gray-200 rounded-xl text-sm bg-card focus:border-primary focus:ring-2 focus:ring-ring/30 outline-none transition-all"
         />
-        {selectedClient && !open ? (
+        {selectedSupplier && !open ? (
           <button
             type="button"
             onClick={clearSelection}
@@ -163,28 +174,28 @@ export function ClientSelect({ value, onChange }: ClientSelectProps) {
 
       {open && (
         <div className="absolute z-30 mt-1.5 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden animate-modal-in">
-          {loading && allClients.length === 0 ? (
+          {loading && allSuppliers.length === 0 ? (
             <div className="flex items-center gap-2 px-4 py-3 text-sm text-gray-500">
               <Loader2 className="w-4 h-4 animate-spin text-violet-500" />
-              Cargando clientes...
+              Cargando proveedores...
             </div>
           ) : filtered.length === 0 && !showCreate ? (
-            <p className="px-4 py-3 text-sm text-gray-500">No hay clientes</p>
+            <p className="px-4 py-3 text-sm text-gray-500">No hay proveedores</p>
           ) : (
             <div className="max-h-56 overflow-y-auto">
-              {filtered.map((c, i) => (
+              {filtered.map((s, i) => (
                 <button
-                  key={c.id}
+                  key={s.id}
                   type="button"
-                  id={`client-opt-${i}`}
-                  onClick={() => selectClient(c)}
+                  id={`supplier-opt-${i}`}
+                  onClick={() => selectSupplier(s)}
                   onMouseEnter={() => setActiveIndex(i)}
                   className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 text-sm text-left transition-colors cursor-pointer ${
                     activeIndex === i ? 'bg-violet-50 text-violet-700' : 'text-gray-700 hover:bg-gray-50'
                   }`}
                 >
-                  <span className="font-medium truncate">{c.name}</span>
-                  <span className="text-xs text-gray-400 font-mono shrink-0">{c.document}</span>
+                  <span className="font-medium truncate">{s.name}</span>
+                  <span className="text-xs text-gray-400 font-mono shrink-0">{s.document}</span>
                 </button>
               ))}
             </div>
@@ -202,21 +213,53 @@ export function ClientSelect({ value, onChange }: ClientSelectProps) {
               }`}
             >
               <Plus className="w-4 h-4" />
-              Crear nuevo cliente "{query.trim()}"
+              Crear nuevo proveedor "{query.trim()}"
             </button>
           )}
         </div>
       )}
 
-      <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Nuevo Cliente">
+      <Modal isOpen={isCreateOpen} onClose={() => setIsCreateOpen(false)} title="Nuevo Proveedor">
         {createError && (
           <div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm">{createError}</div>
         )}
-        <ClientForm
-          submitLabel={creating ? 'Creando...' : 'Crear'}
-          onCancel={() => setIsCreateOpen(false)}
-          onSubmit={handleCreate}
-        />
+        <form onSubmit={handleCreate} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Nombre *</label>
+              <input required type="text" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all focus:outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">NIT / Cédula *</label>
+              <input required type="text" value={form.document} onChange={(e) => setForm({ ...form, document: e.target.value })}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all focus:outline-none" />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all focus:outline-none" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Teléfono</label>
+              <input type="text" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all focus:outline-none" />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Dirección</label>
+            <input type="text" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })}
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all focus:outline-none" />
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <button type="button" onClick={() => setIsCreateOpen(false)} className="px-4 py-2 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors text-sm font-medium">Cancelar</button>
+            <button type="submit" disabled={creating} className="px-4 py-2.5 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium disabled:opacity-50">
+              {creating ? 'Creando...' : 'Crear'}
+            </button>
+          </div>
+        </form>
       </Modal>
     </div>
   )
