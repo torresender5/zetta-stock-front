@@ -6,6 +6,7 @@ import SubscriptionBanner from './SubscriptionBanner'
 import ExpiredLock from './ExpiredLock'
 import { useAuthStore } from '../stores/authStore'
 import { useSubscriptionStore } from '../stores/subscriptionStore'
+import { useRateStore } from '../stores/rateStore'
 import { subscriptionExpired } from '../lib/plan'
 
 export default function Layout() {
@@ -14,11 +15,16 @@ export default function Layout() {
   const subscription = useSubscriptionStore((s) => s.subscription)
   const loading = useSubscriptionStore((s) => s.loading)
   const fetchMySubscription = useSubscriptionStore((s) => s.fetchMySubscription)
+  const fetchRate = useRateStore((s) => s.fetchRate)
   const location = useLocation()
 
   useEffect(() => {
     if (user?.companyId) fetchMySubscription()
   }, [user?.companyId, fetchMySubscription])
+
+  useEffect(() => {
+    fetchRate()
+  }, [fetchRate])
 
   const expired = !loading && subscriptionExpired(subscription)
   const locked = expired && !location.pathname.startsWith('/suscripcion')

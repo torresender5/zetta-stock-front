@@ -10,7 +10,7 @@ import {
   Users,
 } from 'lucide-react'
 import { adminService } from '../services/adminService'
-import { formatCurrency } from '../lib/utils'
+import { formatCop } from '../lib/utils'
 import Modal from '../components/Modal'
 import type { AdminCompany, AdminCompanyDetail } from '../types'
 
@@ -165,7 +165,7 @@ export default function AdminCompanies() {
                     <td className="px-6 py-4 text-muted-foreground">
                       {company.lastSaleAt ? (
                         <>
-                          {formatCurrency(company.lastSaleTotal ?? 0)}
+                          {formatCop(company.lastSaleTotal ?? 0)}
                           <span className="block text-xs text-muted-foreground/70">
                             {new Date(company.lastSaleAt).toLocaleDateString('es-CO', {
                               year: 'numeric',
@@ -283,7 +283,7 @@ export default function AdminCompanies() {
                       <p className="text-sm text-foreground">{sale.clientName}</p>
                       <div className="text-right">
                         <p className="text-sm font-semibold text-foreground tabular-nums">
-                          {formatCurrency(sale.total)}
+                          {formatCop(sale.total)}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {new Date(sale.date).toLocaleDateString('es-CO', {

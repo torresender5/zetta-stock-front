@@ -27,7 +27,13 @@ interface PurchaseStore {
   setPaymentStatusFilter: (status: '' | 'paid' | 'pending') => void
   setStartDateFilter: (date: string) => void
   setEndDateFilter: (date: string) => void
-  addPurchase: (supplierId: string, date: string, items: PurchaseItem[], paymentStatus: 'paid' | 'pending') => Promise<void>
+  addPurchase: (
+    supplierId: string,
+    date: string,
+    items: PurchaseItem[],
+    paymentStatus: 'paid' | 'pending',
+    fxRate?: number,
+  ) => Promise<void>
   updatePurchasePaymentStatus: (id: string, status: 'paid' | 'pending') => Promise<void>
 }
 
@@ -114,7 +120,7 @@ export const usePurchaseStore = create<PurchaseStore>()((set, get) => ({
     get().fetchPurchases()
   },
 
-  addPurchase: async (supplierId, date, items, paymentStatus) => {
+  addPurchase: async (supplierId, date, items, paymentStatus, fxRate) => {
     set({ loading: true, error: null })
     try {
       await purchaseService.create({
@@ -122,6 +128,7 @@ export const usePurchaseStore = create<PurchaseStore>()((set, get) => ({
         date,
         items,
         paymentStatus,
+        fxRate,
       })
       // El API ya incrementa el stock en transacción; solo refrescamos productos
       const { fetchAllProducts } = useProductStore.getState()

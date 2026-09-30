@@ -22,15 +22,18 @@ export interface CreateApartadoDto {
   initialPaymentMethod?: PaymentMethod
   dueDate?: string
   notes?: string
+  fxRate?: number
 }
 
 export interface AddApartadoPaymentDto {
   amount: number
   paymentMethod?: PaymentMethod
+  fxRate?: number
 }
 
 export interface CompleteApartadoDto {
   paymentMethod?: PaymentMethod
+  fxRate?: number
 }
 
 export interface CancelApartadoDto {

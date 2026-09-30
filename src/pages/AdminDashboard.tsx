@@ -25,7 +25,7 @@ import {
   Cell,
 } from 'recharts'
 import { adminService } from '../services/adminService'
-import { formatCurrency } from '../lib/utils'
+import { formatCop } from '../lib/utils'
 import type { AdminDashboardData } from '../types'
 
 const PIE_COLORS = ['#8b5cf6', '#06b6d4', '#f59e0b', '#ef4444', '#10b981', '#6366f1']
@@ -116,7 +116,7 @@ export default function AdminDashboard() {
     },
     {
       label: 'MRV',
-      value: formatCurrency(data.mrv),
+      value: formatCop(data.mrv),
       sub: 'ingreso mensual recurrente',
       icon: Wallet,
       color: 'text-indigo-600',
@@ -148,7 +148,7 @@ export default function AdminDashboard() {
     },
     {
       label: 'Ventas del mes',
-      value: formatCurrency(data.monthSales.total),
+      value: formatCop(data.monthSales.total),
       sub: `${data.monthSales.count} ventas`,
       icon: TrendingUp,
       color: 'text-violet-600',
@@ -156,7 +156,7 @@ export default function AdminDashboard() {
     },
     {
       label: 'Compras del mes',
-      value: formatCurrency(data.monthPurchases.total),
+      value: formatCop(data.monthPurchases.total),
       sub: `${data.monthPurchases.count} compras`,
       icon: ShoppingCart,
       color: 'text-rose-600',
@@ -285,7 +285,7 @@ export default function AdminDashboard() {
               />
               <Tooltip
                 contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
-                formatter={(value) => [formatCurrency(Number(value)), 'Ventas']}
+                formatter={(value) => [formatCop(Number(value)), 'Ventas']}
               />
               <Legend />
               <Bar dataKey="total" name="Ventas" fill="#06b6d4" radius={[0, 6, 6, 0]} maxBarSize={28} />

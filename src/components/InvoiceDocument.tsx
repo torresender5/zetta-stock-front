@@ -1,7 +1,8 @@
 import { Building2, CheckCircle, Clock, XCircle, AlertTriangle } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import type { Invoice } from '../types'
-import { formatCurrency, formatDateOnly } from '../lib/utils'
+import { formatUsd, formatVes, formatDateOnly } from '../lib/utils'
+import type { DisplayCurrency } from './CurrencyToggle'
 
 export function InvoiceStatusBadge({ status }: { status: Invoice['status'] }) {
   if (status === 'paid') {
@@ -27,15 +28,23 @@ export function InvoiceStatusBadge({ status }: { status: Invoice['status'] }) {
 
 interface InvoiceDocumentProps {
   invoice: Invoice
+  currency?: DisplayCurrency
 }
 
-export default function InvoiceDocument({ invoice }: InvoiceDocumentProps) {
+export default function InvoiceDocument({ invoice, currency = 'USD' }: InvoiceDocumentProps) {
   const user = useAuthStore((s) => s.user)
 
   const companyName = user?.companyName ?? 'ZettaStock'
   const companyDocument = user?.companyDocument
   const companyPhone = user?.companyPhoneNumber
   const companyAddress = user?.companyAddress
+
+  const fmt = (usd: number, ves?: number | null) => {
+    if (currency !== 'VES') return formatUsd(usd)
+    if (ves != null) return formatVes(ves)
+    if (invoice.fxRate && invoice.fxRate > 0) return formatVes(usd * invoice.fxRate)
+    return formatUsd(usd)
+  }
 
   return (
     <div id="invoice-print" className="bg-white rounded-3xl shadow-xl ring-1 ring-gray-900/5 overflow-hidden print:shadow-none print:ring-0">
@@ -105,8 +114,8 @@ export default function InvoiceDocument({ invoice }: InvoiceDocumentProps) {
                     {item.size && <p className="text-xs text-gray-400">Talla: {item.size}</p>}
                   </td>
                   <td className="py-3.5 text-right text-gray-600 tabular-nums">{item.quantity}</td>
-                  <td className="py-3.5 text-right text-gray-600 tabular-nums">{formatCurrency(item.unitPrice)}</td>
-                  <td className="py-3.5 text-right font-medium text-gray-900 tabular-nums">{formatCurrency(item.subtotal)}</td>
+                  <td className="py-3.5 text-right text-gray-600 tabular-nums">{fmt(item.unitPrice, item.unitPriceVes)}</td>
+                  <td className="py-3.5 text-right font-medium text-gray-900 tabular-nums">{fmt(item.subtotal, item.subtotalVes)}</td>
                 </tr>
               ))}
             </tbody>
@@ -129,15 +138,15 @@ export default function InvoiceDocument({ invoice }: InvoiceDocumentProps) {
           <div className="w-full sm:w-72 space-y-2">
             <div className="flex justify-between text-sm text-gray-600">
               <span>Subtotal</span>
-              <span className="tabular-nums">{formatCurrency(invoice.subtotal)}</span>
+              <span className="tabular-nums">{fmt(invoice.subtotal, invoice.subtotalVes)}</span>
             </div>
             <div className="flex justify-between text-sm text-gray-600">
               <span>IVA (19%)</span>
-              <span className="tabular-nums">{formatCurrency(invoice.tax)}</span>
+              <span className="tabular-nums">{fmt(invoice.tax, invoice.taxVes)}</span>
             </div>
             <div className="flex justify-between items-center bg-violet-50 rounded-xl px-4 py-3 mt-2">
               <span className="text-sm font-semibold text-violet-700">TOTAL</span>
-              <span className="text-xl font-bold text-violet-700 tabular-nums">{formatCurrency(invoice.total)}</span>
+              <span className="text-xl font-bold text-violet-700 tabular-nums">{fmt(invoice.total, invoice.totalVes)}</span>
             </div>
           </div>
         </div>

@@ -18,8 +18,10 @@ import {
   CalendarDays,
 } from 'lucide-react'
 import { useApartadoStore } from '../stores/apartadoStore'
-import { formatCurrency, formatDate, formatDateOnly } from '../lib/utils'
+import { formatVes, formatDate, formatDateOnly, parseMoney } from '../lib/utils'
+import CurrencyToggle, { useDisplayCurrency } from '../components/CurrencyToggle'
 import Modal from '../components/Modal'
+import MoneyInput from '../components/MoneyInput'
 import type { ApartadoStatus, PaymentMethod } from '../types'
 
 const METHOD_LABELS: Record<PaymentMethod, string> = {
@@ -75,12 +77,15 @@ export default function ApartadoDetails() {
   const [paymentOpen, setPaymentOpen] = useState(false)
   const [completeOpen, setCompleteOpen] = useState(false)
   const [cancelOpen, setCancelOpen] = useState(false)
-  const [amount, setAmount] = useState(0)
+  const [amount, setAmount] = useState('')
   const [method, setMethod] = useState<PaymentMethod>('cash')
   const [cancelReason, setCancelReason] = useState('')
   const [refundMethod, setRefundMethod] = useState<PaymentMethod>('cash')
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const { currency, setCurrency, fmt, rate } = useDisplayCurrency()
+
+  const vesOf = (usd: number) => (rate && rate > 0 ? formatVes(usd * rate) : null)
 
   useEffect(() => {
     if (!id) return
@@ -100,7 +105,7 @@ export default function ApartadoDetails() {
   )
 
   const openPayment = () => {
-    setAmount(balance)
+    setAmount(String(balance))
     setMethod('cash')
     setFormError(null)
     setPaymentOpen(true)
@@ -121,8 +126,8 @@ export default function ApartadoDetails() {
 
   const handlePayment = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!apartado || submitting) return
-    const value = Number(amount) || 0
+    if (!apartado || submitting || !rate) return
+    const value = parseMoney(amount)
     if (value <= 0) {
       setFormError('El monto debe ser mayor a 0')
       return
@@ -133,7 +138,7 @@ export default function ApartadoDetails() {
     }
     setSubmitting(true)
     setFormError(null)
-    const result = await addPayment(apartado.id, value, method)
+    const result = await addPayment(apartado.id, value, method, rate ?? undefined)
     setSubmitting(false)
     if (result.ok) {
       setPaymentOpen(false)
@@ -144,10 +149,14 @@ export default function ApartadoDetails() {
 
   const handleComplete = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!apartado || submitting) return
+    if (!apartado || submitting || !rate) return
     setSubmitting(true)
     setFormError(null)
-    const result = await completeApartado(apartado.id, method)
+    const result = await completeApartado(
+      apartado.id,
+      method,
+      rate ?? undefined,
+    )
     setSubmitting(false)
     if (result.ok) {
       setCompleteOpen(false)
@@ -224,8 +233,10 @@ export default function ApartadoDetails() {
             Creado el {formatDate(apartado.createdAt)}
           </p>
         </div>
-        {isActive && (
-          <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <CurrencyToggle value={currency} onChange={setCurrency} />
+          {isActive && (
+            <div className="flex flex-wrap gap-2">
             <button
               onClick={openPayment}
               className="flex items-center gap-2 bg-white border border-border text-gray-700 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors text-sm font-medium"
@@ -245,7 +256,8 @@ export default function ApartadoDetails() {
               <Trash2 className="w-4 h-4" /> Cancelar
             </button>
           </div>
-        )}
+          )}
+        </div>
       </div>
 
       {error && (
@@ -272,11 +284,11 @@ export default function ApartadoDetails() {
                       {item.size ? ` · ${item.size}` : ''}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {item.quantity} × {formatCurrency(item.unitPrice)}
+                      {item.quantity} × {fmt(item.unitPrice, item.unitPriceVes)}
                     </p>
                   </div>
                   <span className="text-sm font-medium tabular-nums">
-                    {formatCurrency(item.subtotal)}
+                    {fmt(item.subtotal, item.subtotalVes)}
                   </span>
                 </div>
               ))}
@@ -285,17 +297,17 @@ export default function ApartadoDetails() {
               <div className="flex justify-between text-gray-600">
                 <span>Subtotal</span>
                 <span className="tabular-nums">
-                  {formatCurrency(apartado.subtotal)}
+                  {fmt(apartado.subtotal, apartado.subtotalVes)}
                 </span>
               </div>
               <div className="flex justify-between text-gray-600">
                 <span>IVA (19%)</span>
-                <span className="tabular-nums">{formatCurrency(apartado.tax)}</span>
+                <span className="tabular-nums">{fmt(apartado.tax, apartado.taxVes)}</span>
               </div>
               <div className="flex justify-between font-semibold text-gray-900">
                 <span>Total</span>
                 <span className="tabular-nums">
-                  {formatCurrency(apartado.total)}
+                  {fmt(apartado.total, apartado.totalVes)}
                 </span>
               </div>
             </div>
@@ -329,7 +341,7 @@ export default function ApartadoDetails() {
                         </div>
                       </div>
                       <span className="text-sm font-semibold text-emerald-600 tabular-nums">
-                        +{formatCurrency(p.amount)}
+                        +{fmt(p.amount, p.amountVes)}
                       </span>
                     </div>
                   )
@@ -383,13 +395,13 @@ export default function ApartadoDetails() {
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Total</span>
                 <span className="font-medium tabular-nums">
-                  {formatCurrency(apartado.total)}
+                  {fmt(apartado.total, apartado.totalVes)}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Abonado</span>
                 <span className="font-medium text-emerald-600 tabular-nums">
-                  {formatCurrency(apartado.totalPaid)}
+                  {fmt(apartado.totalPaid, apartado.totalPaidVes)}
                 </span>
               </div>
               <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
@@ -401,7 +413,7 @@ export default function ApartadoDetails() {
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Saldo pendiente</span>
                 <span className="font-semibold tabular-nums">
-                  {formatCurrency(balance)}
+                  {fmt(balance)}
                 </span>
               </div>
             </div>
@@ -455,23 +467,23 @@ export default function ApartadoDetails() {
           <p className="text-sm text-gray-500">
             Saldo pendiente:{' '}
             <span className="font-semibold text-gray-900">
-              {formatCurrency(balance)}
+              {fmt(balance)}
             </span>
           </p>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
-              Monto (COP)
+              Monto
             </label>
-            <input
+            <MoneyInput
               required
-              type="number"
-              min={1}
-              max={balance}
-              step={1}
               value={amount}
-              onChange={(e) => setAmount(Number(e.target.value))}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+              onChange={setAmount}
             />
+            {vesOf(parseMoney(amount)) && (
+              <p className="text-xs text-gray-400 mt-1 tabular-nums">
+                = {vesOf(parseMoney(amount))}
+              </p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -499,7 +511,7 @@ export default function ApartadoDetails() {
             </button>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || !rate}
               className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-5 py-2.5 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium disabled:opacity-50"
             >
               {submitting ? 'Guardando...' : 'Registrar abono'}
@@ -523,7 +535,7 @@ export default function ApartadoDetails() {
             <div className="flex justify-between">
               <span>Saldo a cobrar</span>
               <span className="font-semibold tabular-nums">
-                {formatCurrency(balance)}
+                {fmt(balance)}
               </span>
             </div>
             <p className="text-xs text-violet-600">
@@ -556,7 +568,7 @@ export default function ApartadoDetails() {
             </button>
             <button
               type="submit"
-              disabled={submitting}
+              disabled={submitting || !rate}
               className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-5 py-2.5 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium disabled:opacity-50"
             >
               {submitting ? 'Procesando...' : 'Confirmar y facturar'}
@@ -581,7 +593,7 @@ export default function ApartadoDetails() {
             <span>
               Se restaurará el stock de los productos
               {apartado.totalPaid > 0
-                ? ` y se reembolsará ${formatCurrency(apartado.totalPaid)} en la caja.`
+                ? ` y se reembolsará ${fmt(apartado.totalPaid, apartado.totalPaidVes)} en la caja.`
                 : '.'}
             </span>
           </div>

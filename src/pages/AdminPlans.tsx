@@ -12,7 +12,8 @@ import {
 import Modal from '../components/Modal'
 import { subscriptionService } from '../services/subscriptionService'
 import { VIEW_LABELS } from '../lib/permissions'
-import { formatCurrency } from '../lib/utils'
+import { formatCop } from '../lib/utils'
+import MoneyInput from '../components/MoneyInput'
 import type { Plan } from '../types'
 
 type ViewKey = keyof typeof VIEW_LABELS
@@ -238,13 +239,13 @@ export default function AdminPlans() {
                 <div className="flex justify-between">
                   <span className="text-xs font-semibold uppercase tracking-wide">Mensual</span>
                   <span className="font-semibold text-foreground tabular-nums">
-                    {formatCurrency(plan.priceMonthly)}
+                    {formatCop(plan.priceMonthly)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-xs font-semibold uppercase tracking-wide">Anual</span>
                   <span className="font-semibold text-foreground tabular-nums">
-                    {formatCurrency(plan.priceYearly)}
+                    {formatCop(plan.priceYearly)}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -326,24 +327,22 @@ export default function AdminPlans() {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-semibold text-muted-foreground mb-1">
-                Mensual (COP)
+                Mensual
               </label>
-              <input
-                type="number"
+              <MoneyInput
                 value={form.priceMonthly}
-                onChange={(e) => setField('priceMonthly', e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-muted/40 border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500"
+                onChange={(v) => setField('priceMonthly', v)}
+                className="bg-muted/40"
               />
             </div>
             <div>
               <label className="block text-xs font-semibold text-muted-foreground mb-1">
-                Anual (COP)
+                Anual
               </label>
-              <input
-                type="number"
+              <MoneyInput
                 value={form.priceYearly}
-                onChange={(e) => setField('priceYearly', e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-muted/40 border border-border rounded-xl text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-violet-500"
+                onChange={(v) => setField('priceYearly', v)}
+                className="bg-muted/40"
               />
             </div>
             <div>

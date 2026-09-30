@@ -9,7 +9,7 @@ import {
   TrendingUp,
 } from 'lucide-react'
 import { adminService, type AdminBusinessQuery } from '../services/adminService'
-import { formatCurrency } from '../lib/utils'
+import { formatCop } from '../lib/utils'
 import type { AdminBusinessData } from '../types'
 
 type RangeKey = 'all' | '30d' | 'month'
@@ -118,7 +118,7 @@ export default function AdminBusiness() {
                 <div>
                   <p className="text-xs font-medium text-muted-foreground">Ventas del periodo</p>
                   <p className="text-xl font-bold text-foreground tabular-nums">
-                    {formatCurrency(data.sales.total)}
+                    {formatCop(data.sales.total)}
                   </p>
                   <p className="text-xs text-muted-foreground">{data.sales.count} ventas</p>
                 </div>
@@ -132,7 +132,7 @@ export default function AdminBusiness() {
                 <div>
                   <p className="text-xs font-medium text-muted-foreground">Compras del periodo</p>
                   <p className="text-xl font-bold text-foreground tabular-nums">
-                    {formatCurrency(data.purchases.total)}
+                    {formatCop(data.purchases.total)}
                   </p>
                   <p className="text-xs text-muted-foreground">{data.purchases.count} compras</p>
                 </div>
@@ -167,7 +167,7 @@ export default function AdminBusiness() {
                     <div key={row.method}>
                       <div className="flex justify-between text-sm mb-1">
                         <span className="text-foreground font-medium">{row.label}</span>
-                        <span className="text-muted-foreground tabular-nums">{formatCurrency(row.total)}</span>
+                        <span className="text-muted-foreground tabular-nums">{formatCop(row.total)}</span>
                       </div>
                       <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                         <div
@@ -200,7 +200,7 @@ export default function AdminBusiness() {
                       <div className="text-right shrink-0">
                         <p className="text-xs text-muted-foreground">{product.quantity} uds</p>
                         <p className="text-sm font-semibold text-violet-600 tabular-nums">
-                          {formatCurrency(product.revenue)}
+                          {formatCop(product.revenue)}
                         </p>
                       </div>
                     </div>
@@ -267,7 +267,7 @@ export default function AdminBusiness() {
                         <p className="text-xs text-muted-foreground">{row.count} ventas pendientes</p>
                       </div>
                       <span className="text-sm font-semibold text-emerald-600 tabular-nums shrink-0">
-                        {formatCurrency(row.total)}
+                        {formatCop(row.total)}
                       </span>
                     </div>
                   ))}
@@ -290,7 +290,7 @@ export default function AdminBusiness() {
                         <p className="text-xs text-muted-foreground">{row.count} compras pendientes</p>
                       </div>
                       <span className="text-sm font-semibold text-amber-600 tabular-nums shrink-0">
-                        {formatCurrency(row.total)}
+                        {formatCop(row.total)}
                       </span>
                     </div>
                   ))}

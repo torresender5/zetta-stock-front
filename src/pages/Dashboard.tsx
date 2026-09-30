@@ -13,7 +13,8 @@ import { useCajaStore } from '../stores/cajaStore'
 import { useAuthStore } from '../stores/authStore'
 import { canReadModule } from '../lib/permissions'
 import type { ModuleKey } from '../lib/permissions'
-import { formatCurrency, formatDate } from '../lib/utils'
+import { formatDate } from '../lib/utils'
+import CurrencyToggle, { useDisplayCurrency, type DisplayCurrency } from '../components/CurrencyToggle'
 import type { Sale } from '../types'
 
 type Period = 'day' | 'week' | 'month'
@@ -70,8 +71,16 @@ const periodLabels: Record<Period, string> = {
   month: 'Mes',
 }
 
-const currencyFormatter = (value: number) =>
-  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, notation: 'compact' }).format(value)
+const compactCurrency = (value: number, currency: DisplayCurrency, rate: number | null) => {
+  const amount = currency === 'VES' && rate ? value * rate : value
+  return new Intl.NumberFormat(currency === 'VES' ? 'es-VE' : 'en-US', {
+    style: 'currency',
+    currency: currency === 'VES' ? 'VES' : 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+    notation: 'compact',
+  }).format(amount)
+}
 
 const kpiConfig = [
   { key: 'products', label: 'Productos', icon: Package, color: 'text-primary', bgLight: 'bg-primary/10' },
@@ -93,6 +102,7 @@ const kpiModule: Record<(typeof kpiConfig)[number]['key'], ModuleKey> = {
 
 export default function Dashboard() {
   const role = useAuthStore((s) => s.user?.role)
+  const { currency, setCurrency, fmt, rate } = useDisplayCurrency()
   const { products, fetchAllProducts } = useProductStore()
   const { allClients, fetchClients } = useClientStore()
   const { purchases, fetchPurchases } = usePurchaseStore()
@@ -178,17 +188,20 @@ export default function Dashboard() {
   const kpiValues: Record<string, string | number> = {
     products: products.length,
     clients: allClients.length,
-    purchases: formatCurrency(totalPurchases),
-    sales: formatCurrency(totalSales),
+    purchases: fmt(totalPurchases),
+    sales: fmt(totalSales),
     invoices: pendingInvoices,
     lowStock,
   }
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-1">Resumen general de tu negocio</p>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+          <p className="text-sm text-muted-foreground mt-1">Resumen general de tu negocio</p>
+        </div>
+        <CurrencyToggle value={currency} onChange={setCurrency} />
       </div>
 
       {/* KPI Cards */}
@@ -224,7 +237,7 @@ export default function Dashboard() {
               <p className="text-sm text-violet-200">Caja activa</p>
               <p className="text-xl font-bold tabular-nums">
                 {activeCaja
-                  ? formatCurrency(cajaSummary?.expectedTotal ?? activeCaja.baseAmount)
+                  ? fmt(cajaSummary?.expectedTotal ?? activeCaja.baseAmount, cajaSummary?.expectedTotalVes ?? activeCaja.baseAmountVes ?? null)
                   : 'Sin caja abierta'}
               </p>
               <p className="text-xs text-violet-200">
@@ -300,10 +313,10 @@ export default function Dashboard() {
                 <BarChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                   <XAxis dataKey="label" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
-                  <YAxis tickFormatter={currencyFormatter} tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+                  <YAxis tickFormatter={(v) => compactCurrency(Number(v), currency, rate)} tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
                   <Tooltip
                     contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
-                    formatter={(value) => formatCurrency(Number(value))}
+                    formatter={(value) => fmt(Number(value))}
                   />
                   <Legend />
                   <Bar dataKey="amount" name="Monto" fill="#d97706" radius={[6, 6, 0, 0]} maxBarSize={48} />
@@ -374,7 +387,7 @@ export default function Dashboard() {
                     </div>
                     <div className="flex items-center gap-4">
                       <span className="text-xs text-muted-foreground">{p.quantity} uds</span>
-                      <span className="text-sm font-semibold text-violet-600 tabular-nums">{formatCurrency(p.revenue)}</span>
+                      <span className="text-sm font-semibold text-violet-600 tabular-nums">{fmt(p.revenue)}</span>
                     </div>
                   </div>
                 ))}
@@ -425,7 +438,7 @@ export default function Dashboard() {
                     </Pie>
                     <Tooltip
                       contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
-                      formatter={(value, _name, props) => [formatCurrency(Number(value)), props.payload?.name ?? '']}
+                      formatter={(value, _name, props) => [fmt(Number(value)), props.payload?.name ?? '']}
                     />
                   </PieChart>
                 </ResponsiveContainer>
@@ -434,7 +447,7 @@ export default function Dashboard() {
                     <div key={i} className="flex items-center gap-2 text-sm">
                       <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: ['#10b981', '#06b6d4', '#8b5cf6', '#f59e0b', '#ef4444'][i] }} />
                       <span className="text-foreground font-medium">{c.name}</span>
-                      <span className="text-muted-foreground tabular-nums">{formatCurrency(c.totalSpent)}</span>
+                      <span className="text-muted-foreground tabular-nums">{fmt(c.totalSpent)}</span>
                     </div>
                   ))}
                 </div>
@@ -456,7 +469,7 @@ export default function Dashboard() {
                         <p className="text-xs text-muted-foreground">{c.purchases} compras · {c.itemCount} artículos</p>
                       </div>
                     </div>
-                    <span className="text-sm font-semibold text-emerald-600 tabular-nums">{formatCurrency(c.totalSpent)}</span>
+                    <span className="text-sm font-semibold text-emerald-600 tabular-nums">{fmt(c.totalSpent)}</span>
                   </div>
                 ))}
               </div>
@@ -499,7 +512,7 @@ export default function Dashboard() {
                 {accountsPayable.slice(0, 5).map(({ supplier, total }) => (
                   <div key={supplier} className="flex justify-between items-center py-2.5 px-3 rounded-xl hover:bg-background transition-colors">
                     <span className="text-sm font-medium text-foreground">{supplier}</span>
-                    <span className="text-sm font-semibold text-accent tabular-nums">{formatCurrency(total)}</span>
+                    <span className="text-sm font-semibold text-accent tabular-nums">{fmt(total)}</span>
                   </div>
                 ))}
                 {accountsPayable.length > 5 && (
@@ -508,7 +521,7 @@ export default function Dashboard() {
               </div>
               <div className="mt-4 pt-4 border-t border-border flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Total adeudado</span>
-                <span className="text-lg font-bold text-accent tabular-nums">{formatCurrency(totalPayable)}</span>
+                <span className="text-lg font-bold text-accent tabular-nums">{fmt(totalPayable)}</span>
               </div>
             </>
           )}
@@ -546,7 +559,7 @@ export default function Dashboard() {
                 {accountsReceivable.slice(0, 5).map(({ clientName, total }) => (
                   <div key={clientName} className="flex justify-between items-center py-2.5 px-3 rounded-xl hover:bg-background transition-colors">
                     <span className="text-sm font-medium text-foreground">{clientName}</span>
-                    <span className="text-sm font-semibold text-secondary tabular-nums">{formatCurrency(total)}</span>
+                    <span className="text-sm font-semibold text-secondary tabular-nums">{fmt(total)}</span>
                   </div>
                 ))}
                 {accountsReceivable.length > 5 && (
@@ -555,7 +568,7 @@ export default function Dashboard() {
               </div>
               <div className="mt-4 pt-4 border-t border-border flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Total por cobrar</span>
-                <span className="text-lg font-bold text-secondary tabular-nums">{formatCurrency(totalReceivable)}</span>
+                <span className="text-lg font-bold text-secondary tabular-nums">{fmt(totalReceivable)}</span>
               </div>
             </>
           )}

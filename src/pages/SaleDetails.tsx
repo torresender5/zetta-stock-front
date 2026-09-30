@@ -20,7 +20,8 @@ import {
 } from 'lucide-react'
 import { useSaleStore } from '../stores/saleStore'
 import { useProductStore } from '../stores/productStore'
-import { formatCurrency, formatDate, formatDateOnly } from '../lib/utils'
+import { formatDate, formatDateOnly } from '../lib/utils'
+import CurrencyToggle, { useDisplayCurrency } from '../components/CurrencyToggle'
 import Modal from '../components/Modal'
 import type { Sale, Product } from '../types'
 
@@ -91,6 +92,7 @@ export default function SaleDetails() {
   const navigate = useNavigate()
   const { sale, loading, error, fetchSaleById } = useSaleStore()
   const { products, fetchAllProducts } = useProductStore()
+  const { currency, setCurrency, fmt } = useDisplayCurrency()
   const [notFound, setNotFound] = useState(false)
   const [previewProductId, setPreviewProductId] = useState<string | null>(null)
 
@@ -172,13 +174,16 @@ export default function SaleDetails() {
             <h1 className="font-mono text-2xl sm:text-3xl font-bold tracking-tight">
               {sale.saleNumber ?? `#${sale.id}`}
             </h1>
-            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-violet-100">
-              <span className="inline-flex items-center gap-1.5">
-                <User className="w-4 h-4" /> {clientName}
-              </span>
-              <span className="inline-flex items-center gap-1.5">
-                <CalendarDays className="w-4 h-4" /> {formatDateOnly(safeDate)}
-              </span>
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-violet-100">
+                <span className="inline-flex items-center gap-1.5">
+                  <User className="w-4 h-4" /> {clientName}
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <CalendarDays className="w-4 h-4" /> {formatDateOnly(safeDate)}
+                </span>
+              </div>
+              <CurrencyToggle value={currency} onChange={setCurrency} />
             </div>
           </div>
           <span className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold self-start sm:self-auto bg-white text-gray-900 shadow-lg`}>
@@ -199,7 +204,7 @@ export default function SaleDetails() {
             </p>
             {sale.refundAmount != null && (
               <p className="mt-0.5 text-red-600">
-                Reembolso: {formatCurrency(sale.refundAmount)}
+                Reembolso: {fmt(sale.refundAmount, sale.refundAmountVes)}
                 {sale.refundMethod ? ` · ${sale.refundMethod}` : ''}
               </p>
             )}
@@ -254,8 +259,8 @@ export default function SaleDetails() {
                           </div>
                         </td>
                         <td className="px-6 py-4 text-right text-gray-600">{item.quantity}</td>
-                        <td className="px-6 py-4 text-right text-gray-600">{formatCurrency(item.unitPrice)}</td>
-                        <td className="px-6 py-4 text-right font-semibold text-gray-900">{formatCurrency(item.subtotal)}</td>
+                        <td className="px-6 py-4 text-right text-gray-600">{fmt(item.unitPrice, item.unitPriceVes)}</td>
+                        <td className="px-6 py-4 text-right font-semibold text-gray-900">{fmt(item.subtotal, item.subtotalVes)}</td>
                       </tr>
                     )
                   })}
@@ -280,10 +285,10 @@ export default function SaleDetails() {
           <Card>
             <CardHeader icon={<Receipt className="w-4 h-4" />} title="Facturación" />
             <div className="px-6 py-5 space-y-3">
-              <DetailRow label="Subtotal" value={formatCurrency(sale.subtotal)} />
-              <DetailRow label="IVA (19%)" value={formatCurrency(sale.tax)} />
+              <DetailRow label="Subtotal" value={fmt(sale.subtotal, sale.subtotalVes)} />
+              <DetailRow label="IVA (19%)" value={fmt(sale.tax, sale.taxVes)} />
               <div className="border-t border-dashed border-gray-200 pt-3">
-                <DetailRow label="Total" value={formatCurrency(sale.total)} bold />
+                <DetailRow label="Total" value={fmt(sale.total, sale.totalVes)} bold />
               </div>
               <div className="mt-1 flex items-center justify-between pt-3 border-t border-gray-100">
                 <span className="text-sm text-gray-500">Estado de pago</span>
@@ -372,11 +377,11 @@ export default function SaleDetails() {
             <div className="grid grid-cols-3 gap-3">
               <div className="bg-gray-50 rounded-xl px-4 py-3 text-center">
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">P. Venta</p>
-                <p className="font-bold text-gray-900">{formatCurrency(previewProduct.salePrice)}</p>
+                <p className="font-bold text-gray-900">{fmt(previewProduct.salePrice)}</p>
               </div>
               <div className="bg-gray-50 rounded-xl px-4 py-3 text-center">
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">P. Compra</p>
-                <p className="font-semibold text-gray-700">{formatCurrency(previewProduct.purchasePrice)}</p>
+                <p className="font-semibold text-gray-700">{fmt(previewProduct.purchasePrice)}</p>
               </div>
               <div className="bg-gray-50 rounded-xl px-4 py-3 text-center">
                 <p className="text-xs text-gray-400 uppercase tracking-wide mb-1">Stock</p>

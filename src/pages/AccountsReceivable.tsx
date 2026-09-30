@@ -3,65 +3,68 @@ import { useNavigate } from 'react-router-dom'
 import { Search, Calendar, XCircle, Eye, CheckCircle, HandCoins } from 'lucide-react'
 import { useSaleStore } from '../stores/saleStore'
 import { saleService } from '../services/saleService'
-import { formatCurrency, formatDateOnly } from '../lib/utils'
+import { formatDateOnly } from '../lib/utils'
+import CurrencyToggle, { useDisplayCurrency } from '../components/CurrencyToggle'
 import DataTable from '../components/DataTable'
 import ActionDropdown from '../components/ActionDropdown'
 import type { Column } from '../components/DataTable/types'
 import type { Sale, PaginationMeta } from '../types'
 
-const columns: Column<Sale>[] = [
-  {
-    key: 'saleNumber',
-    header: 'N° Venta',
-    width: '7rem',
-    render: (s) =>
-      s.saleNumber ? (
-        <span className="font-mono font-medium text-blue-600">{s.saleNumber}</span>
-      ) : (
-        <span className="text-gray-300">—</span>
-      ),
-  },
-  {
-    key: 'clientName',
-    header: 'Cliente',
-    cellClassName: 'font-medium text-gray-900',
-    truncate: true,
-    render: (s) => s.client?.name ?? s.clientName,
-  },
-  {
-    key: 'date',
-    header: 'Fecha',
-    hideBelow: 'sm',
-    cellClassName: 'text-gray-500',
-    render: (s) => formatDateOnly(s.date),
-  },
-  {
-    key: 'items',
-    header: 'Productos',
-    align: 'right',
-    hideBelow: 'md',
-    render: (s) => s.items.length,
-  },
-  {
-    key: 'subtotal',
-    header: 'Subtotal',
-    align: 'right',
-    hideBelow: 'lg',
-    render: (s) => formatCurrency(s.subtotal),
-  },
-  {
-    key: 'total',
-    header: 'Total',
-    align: 'right',
-    width: '6.5rem',
-    cellClassName: 'font-medium',
-    render: (s) => formatCurrency(s.total),
-  },
-]
-
 export default function AccountsReceivable() {
   const updateSalePaymentStatus = useSaleStore((s) => s.updateSalePaymentStatus)
   const navigate = useNavigate()
+  const { currency, setCurrency, fmt } = useDisplayCurrency()
+
+  const columns: Column<Sale>[] = [
+    {
+      key: 'saleNumber',
+      header: 'N° Venta',
+      width: '7rem',
+      render: (s) =>
+        s.saleNumber ? (
+          <span className="font-mono font-medium text-blue-600">{s.saleNumber}</span>
+        ) : (
+          <span className="text-gray-300">—</span>
+        ),
+    },
+    {
+      key: 'clientName',
+      header: 'Cliente',
+      hideBelow: 'sm',
+      cellClassName: 'font-medium text-gray-900',
+      truncate: true,
+      render: (s) => s.client?.name ?? s.clientName,
+    },
+    {
+      key: 'date',
+      header: 'Fecha',
+      hideBelow: 'sm',
+      cellClassName: 'text-gray-500',
+      render: (s) => formatDateOnly(s.date),
+    },
+    {
+      key: 'items',
+      header: 'Productos',
+      align: 'right',
+      hideBelow: 'md',
+      render: (s) => s.items.length,
+    },
+    {
+      key: 'subtotal',
+      header: 'Subtotal',
+      align: 'right',
+      hideBelow: 'lg',
+      render: (s) => fmt(s.subtotal, s.subtotalVes),
+    },
+    {
+      key: 'total',
+      header: 'Total',
+      align: 'right',
+      width: '6.5rem',
+      cellClassName: 'font-medium',
+      render: (s) => fmt(s.total, s.totalVes),
+    },
+  ]
 
   const [rows, setRows] = useState<Sale[]>([])
   const [meta, setMeta] = useState<PaginationMeta>({
@@ -159,9 +162,12 @@ export default function AccountsReceivable() {
           <h1 className="text-2xl font-bold text-gray-900">Cuentas por Cobrar</h1>
           <p className="text-sm text-gray-500 mt-1">{meta.total} venta(s) pendiente(s)</p>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-gray-500">Total por cobrar</p>
-          <p className="text-2xl font-bold text-blue-600">{formatCurrency(pendingTotal)}</p>
+        <div className="flex flex-col items-end gap-2">
+          <CurrencyToggle value={currency} onChange={setCurrency} />
+          <div className="text-right">
+            <p className="text-sm text-gray-500">Total por cobrar</p>
+            <p className="text-2xl font-bold text-blue-600">{fmt(pendingTotal)}</p>
+          </div>
         </div>
       </div>
 

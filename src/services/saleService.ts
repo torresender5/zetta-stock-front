@@ -9,12 +9,13 @@ import type {
 } from '../types'
 
 export interface CreateSaleDto {
-  clientId: string
+  clientId?: string
   date: string
   items: SaleItem[]
   paymentStatus: 'paid' | 'pending'
   paymentMethod: PaymentMethod
   receivedAmount?: number
+  fxRate?: number
 }
 
 export interface UpdateSaleStatusDto {

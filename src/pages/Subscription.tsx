@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import Modal from '../components/Modal'
 import { useSubscriptionStore } from '../stores/subscriptionStore'
-import { formatCurrency } from '../lib/utils'
+import { formatCop } from '../lib/utils'
 import {
   daysUntil,
   formatSubscriptionEnd,
@@ -207,7 +207,7 @@ export default function Subscription() {
               {subscription?.price ? (
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Zap className="w-4 h-4 text-violet-500" />
-                  {formatCurrency(subscription.price)} /{' '}
+                  {formatCop(subscription.price)} /{' '}
                   {PERIOD_LABELS[subscription.period] ?? subscription.period}
                 </div>
               ) : null}
@@ -276,12 +276,12 @@ export default function Subscription() {
                       <>
                         <div className="flex items-baseline gap-1">
                           <span className="text-3xl font-extrabold text-foreground">
-                            {formatCurrency(plan.priceMonthly)}
+                            {formatCop(plan.priceMonthly)}
                           </span>
                           <span className="text-xs text-muted-foreground">/mes</span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {formatCurrency(plan.priceYearly)}/año · Hasta {plan.maxUsers}{' '}
+                          {formatCop(plan.priceYearly)}/año · Hasta {plan.maxUsers}{' '}
                           usuario{plan.maxUsers === 1 ? '' : 's'}
                         </p>
                       </>
@@ -339,7 +339,7 @@ export default function Subscription() {
                         {order.concept}
                       </td>
                       <td className="px-6 py-3.5 text-foreground font-semibold tabular-nums">
-                        {formatCurrency(order.amount)}
+                        {formatCop(order.amount)}
                       </td>
                       <td className="px-6 py-3.5">
                         <span
@@ -387,7 +387,7 @@ export default function Subscription() {
                   Tu orden quedó pendiente de pago
                 </p>
                 <p className="text-sm text-emerald-700">
-                  {checkout.name} · {formatCurrency(createdOrder.amount)} ·{' '}
+                  {checkout.name} · {formatCop(createdOrder.amount)} ·{' '}
                   {PERIOD_LABELS[createdOrder.period]}
                 </p>
               </div>
@@ -429,7 +429,7 @@ export default function Subscription() {
               >
                 <p className="text-sm font-semibold">Mensual</p>
                 <p className="text-lg font-extrabold text-foreground">
-                  {formatCurrency(checkout.priceMonthly)}
+                  {formatCop(checkout.priceMonthly)}
                 </p>
               </button>
               <button
@@ -442,7 +442,7 @@ export default function Subscription() {
               >
                 <p className="text-sm font-semibold">Anual</p>
                 <p className="text-lg font-extrabold text-foreground">
-                  {formatCurrency(checkout.priceYearly)}
+                  {formatCop(checkout.priceYearly)}
                 </p>
               </button>
             </div>
@@ -461,7 +461,7 @@ export default function Subscription() {
                   <Loader2 className="w-4 h-4 animate-spin" /> Generando…
                 </>
               ) : (
-                <>Generar orden · {formatCurrency(checkoutPrice)}</>
+                <>Generar orden · {formatCop(checkoutPrice)}</>
               )}
             </button>
             <p className="text-center text-xs text-muted-foreground">

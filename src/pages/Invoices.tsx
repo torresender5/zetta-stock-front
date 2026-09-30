@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo } from 'react'
 import { Eye, Printer, X, Search, FileText, ArrowLeft } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { useSaleStore } from '../stores/saleStore'
-import { formatCurrency, formatDateOnly, todayLocal, dateOnlyToLocal } from '../lib/utils'
+import { formatDateOnly, todayLocal, dateOnlyToLocal } from '../lib/utils'
 import InvoiceDocument, { InvoiceStatusBadge } from '../components/InvoiceDocument'
+import CurrencyToggle, { useDisplayCurrency } from '../components/CurrencyToggle'
 import type { Invoice } from '../types'
 
 type PeriodFilter = 'all' | 'day' | 'week' | 'month'
@@ -19,6 +20,7 @@ function getStartOfWeek(date: Date): Date {
 
 export default function Invoices() {
   const { invoices, loading, fetchInvoices } = useSaleStore()
+  const { currency, setCurrency, fmt } = useDisplayCurrency()
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -34,12 +36,13 @@ export default function Invoices() {
   // Auto-open invoice when navigating from Sales with ?saleId=
   useEffect(() => {
     const saleId = searchParams.get('saleId')
-    if (saleId) {
-      const invoice = invoices.find((inv) => inv.saleId === saleId)
-      if (invoice) setSelectedInvoice(invoice)
-      setSearchParams({}, { replace: true })
-    }
-  }, [searchParams, invoices, setSearchParams])
+    if (!saleId) return
+    const invoice = invoices.find((inv) => String(inv.saleId) === saleId)
+    if (invoice) setSelectedInvoice(invoice)
+    // Limpia el param solo al encontrarlo o cuando la carga terminó;
+    // mientras carga, se conserva para no perder la intención de navegación.
+    if (invoice || !loading) setSearchParams({}, { replace: true })
+  }, [searchParams, invoices, loading, setSearchParams])
 
   const filtered = useMemo(() => {
     const now = new Date()
@@ -97,6 +100,7 @@ export default function Invoices() {
             {filtered.length} factura{filtered.length === 1 ? '' : 's'} de las ventas registradas
           </p>
         </div>
+        <CurrencyToggle value={currency} onChange={setCurrency} />
       </div>
 
       {/* Filters */}
@@ -193,7 +197,7 @@ export default function Invoices() {
                     <p className="font-medium text-gray-900 truncate mt-2.5">{inv.clientName}</p>
                     <div className="flex items-center justify-between gap-2 mt-1">
                       <span className="text-xs text-gray-500">{formatDateOnly(inv.date)}</span>
-                      <span className="text-sm font-semibold text-gray-700 tabular-nums">{formatCurrency(inv.total)}</span>
+                      <span className="text-sm font-semibold text-gray-700 tabular-nums">{fmt(inv.total, inv.totalVes)}</span>
                     </div>
                   </button>
                 )
@@ -214,7 +218,7 @@ export default function Invoices() {
                   <Printer className="w-4 h-4" /> Imprimir
                 </button>
               </div>
-              <InvoiceDocument invoice={selectedInvoice} />
+              <InvoiceDocument invoice={selectedInvoice} currency={currency} />
             </div>
           ) : (
             <div className="bg-white rounded-3xl border border-gray-100 flex flex-col items-center justify-center py-24 text-center">
@@ -246,7 +250,7 @@ export default function Invoices() {
             </button>
           </div>
           <div className="p-4 sm:p-6">
-            <InvoiceDocument invoice={selectedInvoice} />
+            <InvoiceDocument invoice={selectedInvoice} currency={currency} />
           </div>
         </div>
       )}

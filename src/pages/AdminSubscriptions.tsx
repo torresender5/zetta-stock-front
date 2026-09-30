@@ -8,7 +8,7 @@ import {
   Users,
 } from 'lucide-react'
 import { subscriptionService } from '../services/subscriptionService'
-import { formatCurrency } from '../lib/utils'
+import { formatCop } from '../lib/utils'
 import { formatSubscriptionEnd } from '../lib/plan'
 import type { Plan } from '../types'
 
@@ -120,7 +120,7 @@ export default function AdminSubscriptions() {
                   </p>
                   {sub.price > 0 && (
                     <p className="font-semibold text-foreground tabular-nums">
-                      {formatCurrency(sub.price)} / <span className="uppercase text-xs">{sub.period}</span>
+                      {formatCop(sub.price)} / <span className="uppercase text-xs">{sub.period}</span>
                     </p>
                   )}
                 </div>

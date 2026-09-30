@@ -67,6 +67,8 @@ export interface PurchaseItem {
   quantity: number
   unitPrice: number
   subtotal: number
+  unitPriceVes?: number | null
+  subtotalVes?: number | null
 }
 
 export interface Purchase {
@@ -80,6 +82,10 @@ export interface Purchase {
   tax: number
   total: number
   paymentStatus: 'paid' | 'pending'
+  fxRate?: number | null
+  subtotalVes?: number | null
+  taxVes?: number | null
+  totalVes?: number | null
   createdAt: string
 }
 
@@ -134,6 +140,8 @@ export interface SaleItem {
   quantity: number
   unitPrice: number
   subtotal: number
+  unitPriceVes?: number | null
+  subtotalVes?: number | null
 }
 
 export interface Sale {
@@ -161,6 +169,13 @@ export interface Sale {
   cancelledReason?: string | null
   refundAmount?: number | null
   refundMethod?: string | null
+  fxRate?: number | null
+  subtotalVes?: number | null
+  taxVes?: number | null
+  totalVes?: number | null
+  receivedAmountVes?: number | null
+  changeAmountVes?: number | null
+  refundAmountVes?: number | null
   invoice?: Invoice | null
   createdAt: string
 }
@@ -178,6 +193,10 @@ export interface Invoice {
   subtotal: number
   tax: number
   total: number
+  fxRate?: number | null
+  subtotalVes?: number | null
+  taxVes?: number | null
+  totalVes?: number | null
   status: 'paid' | 'pending' | 'cancelled'
   cancelledReason?: string | null
   sale?: { items?: SaleItem[] } | null
@@ -204,6 +223,8 @@ export interface CashMovement {
   type: CashMovementType
   paymentMethod: PaymentMethod
   amount: number
+  amountVes?: number | null
+  fxRate?: number | null
   description?: string | null
   createdAt: string
 }
@@ -217,12 +238,15 @@ export interface ApartadoItem {
   quantity: number
   unitPrice: number
   subtotal: number
+  unitPriceVes?: number | null
+  subtotalVes?: number | null
 }
 
 export interface ApartadoPayment {
   id: string
   apartadoId: string
   amount: number
+  amountVes?: number | null
   paymentMethod: PaymentMethod
   date: string
   description?: string | null
@@ -244,6 +268,12 @@ export interface Apartado {
   initialPayment: number
   totalPaid: number
   status: ApartadoStatus
+  fxRate?: number | null
+  subtotalVes?: number | null
+  taxVes?: number | null
+  totalVes?: number | null
+  initialPaymentVes?: number | null
+  totalPaidVes?: number | null
   dueDate?: string | null
   notes?: string | null
   saleId?: string | null
@@ -264,6 +294,11 @@ export interface CashRegister {
   expectedTotal?: number | null
   countedTotal?: number | null
   difference?: number | null
+  fxRate?: number | null
+  baseAmountVes?: number | null
+  expectedTotalVes?: number | null
+  countedTotalVes?: number | null
+  differenceVes?: number | null
   user?: { name?: string; role?: string } | null
   movements: CashMovement[]
 }
@@ -280,6 +315,11 @@ export interface CashRegisterSummary {
   salesByMethod: Partial<Record<PaymentMethod, number>>
   expectedByMethod: Partial<Record<PaymentMethod, number>>
   movementCount: number
+  fxRate?: number | null
+  baseAmountVes?: number | null
+  expectedTotalVes?: number | null
+  countedTotalVes?: number | null
+  differenceVes?: number | null
 }
 
 export interface ReportFilters {

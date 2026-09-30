@@ -2,9 +2,12 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { Search, X, ChevronDown, Plus, Loader2 } from 'lucide-react'
 import { useProductStore } from '../stores/productStore'
+import { useRateStore } from '../stores/rateStore'
 import { productService, type CreateProductDto } from '../services/productService'
-import { CATEGORIES } from '../lib/utils'
+import { CATEGORIES, parseMoney, formatVes } from '../lib/utils'
 import Modal from './Modal'
+import ProductImageInput from './ProductImageInput'
+import MoneyInput from './MoneyInput'
 import type { Product, ProductSize } from '../types'
 
 interface ProductSelectProps {
@@ -31,8 +34,8 @@ const emptyForm = {
   type: '',
   sku: '',
   category: CATEGORIES[0],
-  purchasePrice: 0,
-  salePrice: 0,
+  purchasePrice: '',
+  salePrice: '',
   sizes: [] as ProductSize[],
 }
 
@@ -51,8 +54,11 @@ export function ProductSelect({
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
+  const [imageFile, setImageFile] = useState<File | null>(null)
   const anchorRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  const rate = useRateStore((s) => s.rate)
+  const vesOf = (usd: number) => (rate && rate > 0 ? formatVes(usd * rate) : null)
 
   const catalog = useMemo(
     () => (includeOutOfStock ? products : products.filter((p) => p.stock > 0)),
@@ -116,6 +122,7 @@ export function ProductSelect({
   const openCreate = () => {
     setForm(emptyForm)
     setCreateError(null)
+    setImageFile(null)
     setOpen(false)
     setActiveIndex(-1)
     setIsCreateOpen(true)
@@ -149,20 +156,24 @@ export function ProductSelect({
       type: form.type.trim(),
       sku: form.sku.trim(),
       category: form.category,
-      purchasePrice: Number(form.purchasePrice) || 0,
-      salePrice: Number(form.salePrice) || 0,
+      purchasePrice: parseMoney(form.purchasePrice),
+      salePrice: parseMoney(form.salePrice),
       stock: sizes.length ? sizes.reduce((sum, s) => sum + s.stock, 0) : 0,
       image: null,
       sizes: sizes.length ? sizes : null,
     }
     try {
       const created = await useProductStore.getState().addProduct(payload)
+      if (imageFile) {
+        await productService.uploadImage(created.id, imageFile)
+      }
       await useProductStore.getState().fetchAllProducts()
       onChange(created.id)
       setQuery(created.name)
       setActiveIndex(-1)
       setIsCreateOpen(false)
       setForm(emptyForm)
+      setImageFile(null)
     } catch {
       setCreateError('Error al crear producto')
     } finally {
@@ -354,6 +365,10 @@ export function ProductSelect({
             </select>
           </div>
           <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Imagen</label>
+            <ProductImageInput value={null} onChange={setImageFile} />
+          </div>
+          <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="block text-sm font-medium text-gray-700">Tallas</label>
               <button type="button" onClick={addSize}
@@ -394,15 +409,17 @@ export function ProductSelect({
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Precio Compra</label>
-              <input type="number" min={0} value={form.purchasePrice}
-                onChange={(e) => setForm({ ...form, purchasePrice: Number(e.target.value) })}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all focus:outline-none" />
+              <MoneyInput value={form.purchasePrice} onChange={(v) => setForm({ ...form, purchasePrice: v })} />
+              {vesOf(parseMoney(form.purchasePrice)) && (
+                <p className="text-xs text-gray-400 mt-1 tabular-nums">= {vesOf(parseMoney(form.purchasePrice))}</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Precio Venta</label>
-              <input type="number" min={0} value={form.salePrice}
-                onChange={(e) => setForm({ ...form, salePrice: Number(e.target.value) })}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all focus:outline-none" />
+              <MoneyInput value={form.salePrice} onChange={(v) => setForm({ ...form, salePrice: v })} />
+              {vesOf(parseMoney(form.salePrice)) && (
+                <p className="text-xs text-gray-400 mt-1 tabular-nums">= {vesOf(parseMoney(form.salePrice))}</p>
+              )}
             </div>
           </div>
           <div className="flex justify-end gap-3 pt-4">

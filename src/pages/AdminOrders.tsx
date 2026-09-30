@@ -9,7 +9,7 @@ import {
   Check,
 } from 'lucide-react'
 import { subscriptionService } from '../services/subscriptionService'
-import { formatCurrency } from '../lib/utils'
+import { formatCop } from '../lib/utils'
 import type { PaymentOrder } from '../types'
 
 type AdminOrder = PaymentOrder & { companyId: number; companyName: string }
@@ -113,7 +113,7 @@ export default function AdminOrders() {
                       </span>
                     </td>
                     <td className="px-6 py-4 font-semibold text-foreground tabular-nums">
-                      {formatCurrency(order.amount)}
+                      {formatCop(order.amount)}
                     </td>
                     <td className="px-6 py-4">
                       {order.status === 'pending' ? (

@@ -46,6 +46,7 @@ interface SaleStore {
     paymentStatus: 'paid' | 'pending',
     paymentMethod: PaymentMethod,
     receivedAmount?: number,
+    fxRate?: number,
   ) => Promise<Invoice>
   updateSalePaymentStatus: (
     id: string,
@@ -156,16 +157,19 @@ export const useSaleStore = create<SaleStore>()((set, get) => ({
     }
   },
 
-  addSale: async (clientId, date, items, paymentStatus, paymentMethod, receivedAmount) => {
+  addSale: async (clientId, date, items, paymentStatus, paymentMethod, receivedAmount, fxRate) => {
     set({ loading: true, error: null })
     try {
       const { sale, invoice } = await saleService.create({
-        clientId,
+        // Si no hay cliente seleccionado se omite: el API registra la venta
+        // con el cliente genérico "Consumidor final"
+        ...(clientId ? { clientId } : {}),
         date,
         items,
         paymentStatus,
         paymentMethod,
         receivedAmount,
+        fxRate,
       })
       // El API ya descuenta el stock en transacción (incluye tallas);
       // solo refrescamos productos para reflejar el stock actualizado

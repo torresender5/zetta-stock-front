@@ -10,6 +10,7 @@ import type {
 export interface OpenCashRegisterDto {
   baseAmount: number
   name?: string
+  fxRate?: number
 }
 
 export interface CreateCashMovementDto {
@@ -17,6 +18,7 @@ export interface CreateCashMovementDto {
   paymentMethod: PaymentMethod
   amount: number
   description?: string
+  fxRate?: number
 }
 
 export interface CloseCashRegisterDto {

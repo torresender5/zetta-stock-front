@@ -1,9 +1,12 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { X, Trash2, Minus, Plus, ShoppingBag } from 'lucide-react'
 import { useCartStore } from '../stores/cartStore'
 import { useClientStore } from '../stores/clientStore'
 import { useSaleStore } from '../stores/saleStore'
-import { formatCurrency, TAX_RATE, todayLocal } from '../lib/utils'
+import { formatVes, TAX_RATE, todayLocal } from '../lib/utils'
+import { useRateStore } from '../stores/rateStore'
+import CurrencyToggle, { useDisplayCurrency } from './CurrencyToggle'
+import FullScreenLoader from './FullScreenLoader'
 import { ClientSelect } from './ClientSelect'
 import { useNavigate } from 'react-router-dom'
 import type { PaymentMethod } from '../types'
@@ -25,10 +28,15 @@ export default function CartPanel({ isOpen, onClose }: CartPanelProps) {
   const { allClients, fetchClients } = useClientStore()
   const { addSale } = useSaleStore()
   const navigate = useNavigate()
+  const { currency, setCurrency, fmt, rate } = useDisplayCurrency()
 
   const [clientId, setClientId] = useState('')
   const [paymentStatus, setPaymentStatus] = useState<'paid' | 'pending'>('paid')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
+  const [submitting, setSubmitting] = useState(false)
+  const submittingRef = useRef(false)
+
+  const vesOf = (usd: number) => (rate && rate > 0 ? formatVes(usd * rate) : null)
 
   useEffect(() => {
     if (isOpen && allClients.length === 0) {
@@ -42,7 +50,11 @@ export default function CartPanel({ isOpen, onClose }: CartPanelProps) {
   const itemCount = items.reduce((sum, i) => sum + i.quantity, 0)
 
   const handleFinalize = async () => {
-    if (items.length === 0 || !clientId) return
+    if (items.length === 0) return
+    if (!rate || rate <= 0) return
+    if (submittingRef.current) return
+    submittingRef.current = true
+    setSubmitting(true)
 
     const saleItems = items.map((i) => ({
       productId: i.productId,
@@ -60,6 +72,8 @@ export default function CartPanel({ isOpen, onClose }: CartPanelProps) {
         saleItems,
         paymentStatus,
         paymentStatus === 'paid' ? paymentMethod : 'credit',
+        undefined,
+        rate,
       )
       clear()
       setClientId('')
@@ -69,6 +83,9 @@ export default function CartPanel({ isOpen, onClose }: CartPanelProps) {
       navigate('/sales')
     } catch {
       // error se maneja en el store
+    } finally {
+      submittingRef.current = false
+      setSubmitting(false)
     }
   }
 
@@ -76,7 +93,7 @@ export default function CartPanel({ isOpen, onClose }: CartPanelProps) {
     <>
       {/* Overlay */}
       {isOpen && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" onClick={onClose} aria-hidden="true" />
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-40" onClick={() => { if (!submitting) onClose() }} aria-hidden="true" />
       )}
 
       {/* Panel */}
@@ -88,22 +105,26 @@ export default function CartPanel({ isOpen, onClose }: CartPanelProps) {
         }`}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-4 border-b border-border">
-          <div className="flex items-center gap-2">
-            <ShoppingBag className="w-5 h-5 text-primary" aria-hidden="true" />
-            <h2 className="text-lg font-semibold text-foreground">Carrito de Venta</h2>
-            {itemCount > 0 && (
-              <span className="bg-primary text-white text-xs font-bold px-2 py-0.5 rounded-full">{itemCount}</span>
-            )}
+<div className="flex items-center justify-between p-4 border-b border-border">
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="w-5 h-5 text-primary" aria-hidden="true" />
+              <h2 className="text-lg font-semibold text-foreground">Carrito de Venta</h2>
+              {itemCount > 0 && (
+                <span className="bg-primary text-white text-xs font-bold px-2 py-0.5 rounded-full">{itemCount}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <CurrencyToggle value={currency} onChange={setCurrency} />
+              <button
+                onClick={onClose}
+                aria-label="Cerrar carrito"
+                disabled={submitting}
+                className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            aria-label="Cerrar carrito"
-            className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
 
         {/* Body */}
         {items.length === 0 ? (
@@ -127,9 +148,9 @@ export default function CartPanel({ isOpen, onClose }: CartPanelProps) {
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">{formatCurrency(item.unitPrice)} c/u</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{fmt(item.unitPrice)} c/u</p>
                     <p className="text-sm font-semibold text-primary mt-1 tabular-nums">
-                      {formatCurrency(item.unitPrice * item.quantity)}
+                      {fmt(item.unitPrice * item.quantity)}
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -166,7 +187,7 @@ export default function CartPanel({ isOpen, onClose }: CartPanelProps) {
             <div className="p-4 border-t border-border space-y-3">
               <div>
                 <label htmlFor="cart-client" className="block text-sm font-medium text-foreground mb-1.5">
-                  Cliente *
+                  Cliente (opcional)
                 </label>
                 <ClientSelect
                   value={clientId}
@@ -238,36 +259,54 @@ export default function CartPanel({ isOpen, onClose }: CartPanelProps) {
             <div className="space-y-1 text-sm">
               <div className="flex justify-between text-muted-foreground">
                 <span>Subtotal</span>
-                <span className="tabular-nums">{formatCurrency(subtotal)}</span>
+                <span className="tabular-nums">{fmt(subtotal)}</span>
               </div>
               <div className="flex justify-between text-muted-foreground">
                 <span>IVA (19%)</span>
-                <span className="tabular-nums">{formatCurrency(tax)}</span>
+                <span className="tabular-nums">{fmt(tax)}</span>
               </div>
               <div className="flex justify-between text-lg font-bold text-foreground border-t border-border pt-2">
                 <span>Total</span>
-                <span className="tabular-nums">{formatCurrency(total)}</span>
+                <span className="tabular-nums">{fmt(total)}</span>
               </div>
+              {rate && rate > 0 && currency === 'VES' && (
+                <p className="text-xs text-muted-foreground text-right tabular-nums">Tasa: 1 US$ = {formatVes(rate)}</p>
+              )}
             </div>
+
+            {vesOf(total) && currency === 'USD' && (
+              <p className="text-xs text-muted-foreground text-right tabular-nums">
+                Total en Bs: {vesOf(total)}
+              </p>
+            )}
+
+            {!rate && (
+              <p className="text-xs text-red-600">
+                No hay tasa de cambio disponible. La venta no se puede registrar.
+              </p>
+            )}
 
             <div className="flex gap-2">
               <button
                 onClick={clear}
-                className="px-4 py-2.5 text-sm bg-gray-100 rounded-xl text-gray-600 hover:bg-gray-200 transition-colors font-medium cursor-pointer"
+                disabled={submitting}
+                className="px-4 py-2.5 text-sm bg-gray-100 rounded-xl text-gray-600 hover:bg-gray-200 transition-colors font-medium cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Vaciar
               </button>
               <button
                 onClick={handleFinalize}
-                disabled={!clientId}
+                disabled={!rate || submitting}
                 className="flex-1 py-2.5 text-sm font-medium bg-primary hover:bg-primary-hover text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-colors shadow-md shadow-primary/20 cursor-pointer"
               >
-                Finalizar Venta
+                {submitting ? 'Registrando...' : 'Finalizar Venta'}
               </button>
             </div>
           </div>
         )}
       </div>
+
+      <FullScreenLoader loading={submitting} text="Registrando venta..." />
     </>
   )
 }

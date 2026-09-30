@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react'
-import { Plus, Minus, Trash2, Info, CheckCircle, Clock, ShoppingBag, Search, Calendar, XCircle } from 'lucide-react'
+import { Plus, Minus, Trash2, Info, CheckCircle, Clock, ShoppingBag, Search, Calendar, XCircle, AlertTriangle, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useProductStore } from '../stores/productStore'
 import { usePurchaseStore } from '../stores/purchaseStore'
 import { useSupplierStore } from '../stores/supplierStore'
-import { formatCurrency, formatDateOnly, TAX_RATE, todayLocal } from '../lib/utils'
+import { useRateStore } from '../stores/rateStore'
+import { formatVes, formatDateOnly, TAX_RATE, todayLocal, parseMoney } from '../lib/utils'
 import Modal from '../components/Modal'
 import ActionDropdown from '../components/ActionDropdown'
 import DataTable from '../components/DataTable'
+import MoneyInput from '../components/MoneyInput'
+import CurrencyToggle, { useDisplayCurrency } from '../components/CurrencyToggle'
 import { ProductSelect } from '../components/ProductSelect'
 import { SupplierSelect } from '../components/SupplierSelect'
 import type { Column } from '../components/DataTable/types'
@@ -27,40 +30,6 @@ const statusBadge = (status: Purchase['paymentStatus']) => {
     </span>
   )
 }
-
-const columns: Column<Purchase>[] = [
-  {
-    key: 'purchaseNumber',
-    header: 'N° Compra',
-    width: '8rem',
-    render: (p) =>
-      p.purchaseNumber ? (
-        <span className="font-mono font-medium text-blue-600">{p.purchaseNumber}</span>
-      ) : (
-        <span className="text-gray-300">—</span>
-      ),
-  },
-  {
-    key: 'supplier',
-    header: 'Proveedor',
-    cellClassName: 'font-medium text-gray-900',
-    truncate: true,
-    render: (p) => p.supplier?.name ?? 'Sin proveedor',
-  },
-  { key: 'date', header: 'Fecha', hideBelow: 'sm', cellClassName: 'text-gray-500', render: (p) => formatDateOnly(p.date) },
-  { key: 'items', header: 'Productos', align: 'right', hideBelow: 'md', render: (p) => p.items.length },
-  { key: 'subtotal', header: 'Subtotal', align: 'right', hideBelow: 'lg', render: (p) => formatCurrency(p.subtotal) },
-  { key: 'tax', header: 'IVA', align: 'right', hideBelow: 'xl', render: (p) => formatCurrency(p.tax) },
-  { key: 'total', header: 'Total', align: 'right', width: '6.5rem', cellClassName: 'font-medium', render: (p) => formatCurrency(p.total) },
-  {
-    key: 'paymentStatus',
-    header: 'Estado',
-    align: 'right',
-    hideBelow: 'sm',
-    width: '6rem',
-    render: (p) => statusBadge(p.paymentStatus ?? 'pending'),
-  },
-]
 
 export default function Purchases() {
   const { products, fetchAllProducts } = useProductStore()
@@ -87,6 +56,8 @@ export default function Purchases() {
     setEndDateFilter,
   } = usePurchaseStore()
   const navigate = useNavigate()
+  const { currency, setCurrency, fmt, rate } = useDisplayCurrency()
+  const refreshRate = useRateStore((s) => s.refresh)
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [supplierId, setSupplierId] = useState('')
@@ -97,8 +68,45 @@ export default function Purchases() {
   const [pendingProduct, setPendingProduct] = useState<Product | null>(null)
   const [pendingSize, setPendingSize] = useState('')
   const [pendingQty, setPendingQty] = useState(1)
-  const [pendingUnitPrice, setPendingUnitPrice] = useState(0)
+  const [pendingUnitPrice, setPendingUnitPrice] = useState('')
   const [searchInput, setSearchInput] = useState(search)
+
+  const vesOf = (usd: number) => (rate && rate > 0 ? formatVes(usd * rate) : null)
+
+  const columns: Column<Purchase>[] = [
+    {
+      key: 'purchaseNumber',
+      header: 'N° Compra',
+      width: '8rem',
+      render: (p) =>
+        p.purchaseNumber ? (
+          <span className="font-mono font-medium text-blue-600">{p.purchaseNumber}</span>
+        ) : (
+          <span className="text-gray-300">—</span>
+        ),
+    },
+    {
+      key: 'supplier',
+      header: 'Proveedor',
+      hideBelow: 'sm',
+      cellClassName: 'font-medium text-gray-900',
+      truncate: true,
+      render: (p) => p.supplier?.name ?? 'Sin proveedor',
+    },
+    { key: 'date', header: 'Fecha', hideBelow: 'sm', cellClassName: 'text-gray-500', render: (p) => formatDateOnly(p.date) },
+    { key: 'items', header: 'Productos', align: 'right', hideBelow: 'md', render: (p) => p.items.length },
+    { key: 'subtotal', header: 'Subtotal', align: 'right', hideBelow: 'lg', render: (p) => fmt(p.subtotal, p.subtotalVes) },
+    { key: 'tax', header: 'IVA', align: 'right', hideBelow: 'xl', render: (p) => fmt(p.tax, p.taxVes) },
+    { key: 'total', header: 'Total', align: 'right', width: '6.5rem', cellClassName: 'font-medium', render: (p) => fmt(p.total, p.totalVes) },
+    {
+      key: 'paymentStatus',
+      header: 'Estado',
+      align: 'right',
+      hideBelow: 'sm',
+      width: '6rem',
+      render: (p) => statusBadge(p.paymentStatus ?? 'pending'),
+    },
+  ]
 
   useEffect(() => {
     fetchAllProducts()
@@ -119,7 +127,7 @@ export default function Purchases() {
     setPendingProduct(product)
     setPendingSize('')
     setPendingQty(1)
-    setPendingUnitPrice(product.purchasePrice ?? 0)
+    setPendingUnitPrice(String(product.purchasePrice ?? 0))
   }
 
   const closeAddModal = () => setPendingProduct(null)
@@ -129,7 +137,7 @@ export default function Purchases() {
     const hasSizes = (pendingProduct.sizes ?? []).length > 0
     if (hasSizes && !pendingSize) return
     const quantity = Math.max(1, pendingQty)
-    const unitPrice = Math.max(0, pendingUnitPrice)
+    const unitPrice = parseMoney(pendingUnitPrice)
     setItems([
       ...items,
       {
@@ -166,8 +174,9 @@ export default function Purchases() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (items.length === 0 || !supplierId) return
+    if (!rate || rate <= 0) return
     try {
-      await addPurchase(supplierId, date, items, paymentStatus)
+      await addPurchase(supplierId, date, items, paymentStatus, rate)
       setIsModalOpen(false)
       setSupplierId('')
       setPaymentStatus('paid')
@@ -185,9 +194,12 @@ export default function Purchases() {
           <h1 className="text-2xl font-bold text-gray-900">Compras</h1>
           <p className="text-sm text-gray-500 mt-1">{meta.total} compras registradas</p>
         </div>
-        <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-2.5 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium">
-          <Plus className="w-4 h-4" /> Nueva Compra
-        </button>
+        <div className="flex items-center gap-3">
+          <CurrencyToggle value={currency} onChange={setCurrency} />
+          <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-2.5 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium">
+            <Plus className="w-4 h-4" /> Nueva Compra
+          </button>
+        </div>
       </div>
 
       {/* Filtros */}
@@ -297,6 +309,32 @@ export default function Purchases() {
 
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Nueva Compra" size="xl">
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="flex items-center justify-between gap-2 rounded-xl bg-blue-50 border border-blue-100 px-4 py-2.5">
+            <p className="flex items-center gap-2 text-sm text-blue-700">
+              <RefreshCw className="w-4 h-4" />
+              Tasa del día:
+              <span className="font-semibold tabular-nums">
+                {rate ? `1 US$ = ${formatVes(rate)}` : '—'}
+              </span>
+            </p>
+            <button
+              type="button"
+              onClick={() => refreshRate()}
+              className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg px-2 py-1 transition-colors"
+            >
+              Actualizar
+            </button>
+          </div>
+
+          {!rate && (
+            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-700">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                No hay una tasa de cambio disponible. Actualiza la tasa para poder registrar la compra.
+              </span>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Proveedor *</label>
@@ -377,7 +415,7 @@ export default function Purchases() {
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-gray-500">{formatCurrency(item.unitPrice)} c/u</p>
+                        <p className="text-xs text-gray-500">{fmt(item.unitPrice)} c/u</p>
                       </div>
                     </div>
                     <div className="flex items-center justify-between sm:justify-end gap-3">
@@ -402,7 +440,7 @@ export default function Purchases() {
                         </button>
                       </div>
                       <p className="text-sm font-semibold text-violet-600 tabular-nums w-24 text-right sm:text-left">
-                        {formatCurrency(item.subtotal)}
+                        {fmt(item.subtotal)}
                       </p>
                       <button
                         type="button"
@@ -420,14 +458,14 @@ export default function Purchases() {
           )}
 
           <div className="bg-gray-50 rounded-xl p-4 space-y-1 text-sm">
-            <div className="flex justify-between"><span>Subtotal:</span><span>{formatCurrency(subtotal)}</span></div>
-            <div className="flex justify-between text-gray-500"><span>IVA (19%):</span><span>{formatCurrency(tax)}</span></div>
-            <div className="flex justify-between text-lg font-bold border-t pt-2"><span>Total:</span><span>{formatCurrency(total)}</span></div>
+            <div className="flex justify-between"><span>Subtotal:</span><span>{fmt(subtotal, rate ? subtotal * rate : null)}</span></div>
+            <div className="flex justify-between text-gray-500"><span>IVA (19%):</span><span>{fmt(tax, rate ? tax * rate : null)}</span></div>
+            <div className="flex justify-between text-lg font-bold border-t pt-2"><span>Total:</span><span>{fmt(total, rate ? total * rate : null)}</span></div>
           </div>
 
           <div className="flex flex-col sm:flex-row justify-end gap-3">
             <button type="button" onClick={() => setIsModalOpen(false)} className="bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors text-sm font-medium px-4 py-2.5">Cancelar</button>
-            <button type="submit" disabled={items.length === 0 || !supplierId}
+            <button type="submit" disabled={items.length === 0 || !supplierId || !rate}
               className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-2.5 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium disabled:opacity-50">
               Registrar Compra
             </button>
@@ -452,7 +490,7 @@ export default function Purchases() {
               )}
               <div className="min-w-0">
                 <p className="font-medium text-gray-900 truncate">{pendingProduct.name}</p>
-                <p className="text-sm text-gray-500">{pendingProduct.code} · {formatCurrency(pendingProduct.purchasePrice ?? 0)} c/u</p>
+                <p className="text-sm text-gray-500">{pendingProduct.code} · {fmt(pendingProduct.purchasePrice ?? 0)} c/u</p>
               </div>
             </div>
 
@@ -518,22 +556,17 @@ export default function Purchases() {
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Precio unit. (COP) *</label>
-                <input
-                  type="number"
-                  min={0}
-                  step="100"
+                <label className="block text-sm font-medium text-gray-700 mb-2">Precio unit. *</label>
+                <MoneyInput
                   value={pendingUnitPrice}
-                  onChange={(e) => setPendingUnitPrice(Math.max(0, Number(e.target.value) || 0))}
-                  className="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm tabular-nums focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
-                  placeholder="0"
+                  onChange={setPendingUnitPrice}
                 />
               </div>
             </div>
 
             <div className="bg-gray-50 rounded-xl p-4 flex justify-between items-center">
               <span className="text-sm text-gray-600">Subtotal</span>
-              <span className="text-lg font-bold text-gray-900 tabular-nums">{formatCurrency(pendingUnitPrice * pendingQty)}</span>
+              <span className="text-lg font-bold text-gray-900 tabular-nums">{fmt(parseMoney(pendingUnitPrice) * pendingQty)}</span>
             </div>
 
             <div className="flex justify-end gap-3 pt-1">

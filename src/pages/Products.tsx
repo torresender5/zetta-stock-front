@@ -1,12 +1,16 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Search, Edit, Trash2, ShoppingCart, ShoppingBag, Package, ImageIcon, X, Ruler, Calendar, XCircle, Upload } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, ShoppingCart, ShoppingBag, Package, ImageIcon, X, Ruler, Calendar, XCircle } from 'lucide-react'
 import { useProductStore } from '../stores/productStore'
 import { useCartStore } from '../stores/cartStore'
-import { formatCurrency, CATEGORIES } from '../lib/utils'
+import { useRateStore } from '../stores/rateStore'
+import { formatVes, CATEGORIES, parseMoney, generateProductCode } from '../lib/utils'
 import Modal from '../components/Modal'
 import ActionDropdown from '../components/ActionDropdown'
 import CartPanel from '../components/CartPanel'
 import DataTable from '../components/DataTable'
+import ProductImageInput from '../components/ProductImageInput'
+import MoneyInput from '../components/MoneyInput'
+import CurrencyToggle, { useDisplayCurrency } from '../components/CurrencyToggle'
 import { productService } from '../services/productService'
 import type { Column } from '../components/DataTable/types'
 import type { Product, ProductSize } from '../types'
@@ -18,65 +22,12 @@ const emptyForm = {
   type: '',
   sku: '',
   category: CATEGORIES[0],
-  purchasePrice: 0,
-  salePrice: 0,
+  purchasePrice: '',
+  salePrice: '',
   stock: 0,
   image: '',
   sizes: [] as ProductSize[],
 }
-
-const columns: Column<Product>[] = [
-  {
-    key: 'image',
-    header: 'Imagen',
-    hideBelow: 'sm',
-    width: '4.5rem',
-    render: (p) =>
-      p.image ? (
-        <img
-          src={p.image}
-          alt={p.name}
-          className="w-10 h-10 rounded-lg object-cover border border-gray-100"
-          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-        />
-      ) : (
-        <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center">
-          <ImageIcon className="w-4 h-4 text-gray-300" />
-        </div>
-      ),
-  },
-  { key: 'name', header: 'Nombre', cellClassName: 'font-medium text-gray-900', truncate: true },
-  { key: 'code', header: 'Código', hideBelow: 'lg', cellClassName: 'text-gray-500 font-mono text-xs' },
-  { key: 'sku', header: 'SKU', hideBelow: 'lg', cellClassName: 'text-gray-500 font-mono text-xs' },
-  { key: 'type', header: 'Tipo', hideBelow: 'xl', cellClassName: 'text-gray-500' },
-  {
-    key: 'category',
-    header: 'Categoría',
-    hideBelow: 'lg',
-    render: (p) => (
-      <span className="inline-flex px-2.5 py-1 bg-violet-50 text-violet-600 rounded-lg text-xs font-medium">
-        {p.category}
-      </span>
-    ),
-  },
-  { key: 'purchasePrice', header: 'P. Compra', align: 'right', hideBelow: 'xl', render: (p) => formatCurrency(p.purchasePrice) },
-  { key: 'salePrice', header: 'P. Venta', align: 'right', hideBelow: 'sm', width: '7rem', render: (p) => formatCurrency(p.salePrice) },
-  {
-    key: 'stock',
-    header: 'Stock',
-    align: 'right',
-    width: '6rem',
-    render: (p) => (
-      <span
-        className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-semibold ${
-          p.stock === 0 ? 'bg-red-50 text-red-600' : p.stock < 10 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'
-        }`}
-      >
-        {p.stock}
-      </span>
-    ),
-  },
-]
 
 export default function Products() {
   const {
@@ -86,6 +37,8 @@ export default function Products() {
     addProduct, updateProduct, deleteProduct,
   } = useProductStore()
   const cartStore = useCartStore()
+  const { currency, setCurrency, fmt } = useDisplayCurrency()
+  const rate = useRateStore((s) => s.rate)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isCartOpen, setIsCartOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -93,10 +46,67 @@ export default function Products() {
   const [searchInput, setSearchInput] = useState(search)
   const [sizesModalProduct, setSizesModalProduct] = useState<Product | null>(null)
   const [imageFile, setImageFile] = useState<File | null>(null)
-  const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [sizeSelectorProduct, setSizeSelectorProduct] = useState<Product | null>(null)
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  const [autoGenerateCode, setAutoGenerateCode] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
+
+  const vesOf = (usd: number) => (rate && rate > 0 ? formatVes(usd * rate) : null)
+
+  const columns: Column<Product>[] = [
+    {
+      key: 'image',
+      header: 'Imagen',
+      hideBelow: 'sm',
+      width: '4.5rem',
+      render: (p) =>
+        p.image ? (
+          <img
+            src={p.image}
+            alt={p.name}
+            className="w-10 h-10 rounded-lg object-cover border border-gray-100 cursor-pointer hover:ring-2 hover:ring-violet-400 transition-all"
+            onClick={() => setSelectedImage(p.image!)}
+            onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+          />
+        ) : (
+          <div className="w-10 h-10 rounded-lg bg-gray-50 flex items-center justify-center">
+            <ImageIcon className="w-4 h-4 text-gray-300" />
+          </div>
+        ),
+    },
+    { key: 'name', header: 'Nombre', cellClassName: 'font-medium text-gray-900', truncate: true },
+    { key: 'code', header: 'Código', hideBelow: 'lg', cellClassName: 'text-gray-500 font-mono text-xs' },
+    { key: 'sku', header: 'SKU', hideBelow: 'lg', cellClassName: 'text-gray-500 font-mono text-xs' },
+    { key: 'type', header: 'Tipo', hideBelow: 'xl', cellClassName: 'text-gray-500' },
+    {
+      key: 'category',
+      header: 'Categoría',
+      hideBelow: 'lg',
+      render: (p) => (
+        <span className="inline-flex px-2.5 py-1 bg-violet-50 text-violet-600 rounded-lg text-xs font-medium">
+          {p.category}
+        </span>
+      ),
+    },
+    { key: 'purchasePrice', header: 'P. Compra', align: 'right', hideBelow: 'xl', render: (p) => fmt(p.purchasePrice) },
+    { key: 'salePrice', header: 'P. Venta', align: 'right', hideBelow: 'sm', width: '7rem', render: (p) => fmt(p.salePrice) },
+    {
+      key: 'stock',
+      header: 'Stock',
+      align: 'right',
+      width: '6rem',
+      render: (p) => (
+        <span
+          className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-semibold ${
+            p.stock === 0 ? 'bg-red-50 text-red-600' : p.stock < 10 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'
+          }`}
+        >
+          {p.stock}
+        </span>
+      ),
+    },
+  ]
 
   useEffect(() => {
     fetchProducts()
@@ -128,7 +138,7 @@ export default function Products() {
     setForm(emptyForm)
     setEditingId(null)
     setImageFile(null)
-    setImagePreview(null)
+    setAutoGenerateCode(false)
     setIsModalOpen(true)
   }
 
@@ -140,15 +150,15 @@ export default function Products() {
       type: product.type,
       sku: product.sku,
       category: product.category,
-      purchasePrice: product.purchasePrice,
-      salePrice: product.salePrice,
+      purchasePrice: String(product.purchasePrice),
+      salePrice: String(product.salePrice),
       stock: product.stock,
       image: product.image ?? '',
       sizes: (product.sizes ?? []).map((s) => ({ size: s.size, stock: s.stock ?? 0 })),
     })
     setEditingId(product.id)
     setImageFile(null)
-    setImagePreview(product.image ?? null)
+    setAutoGenerateCode(false)
     setIsModalOpen(true)
   }
 
@@ -160,6 +170,8 @@ export default function Products() {
     const payload = {
       ...form,
       image: form.image.trim() || null,
+      purchasePrice: parseMoney(form.purchasePrice),
+      salePrice: parseMoney(form.salePrice),
       sizes: form.sizes.filter((s) => s.size.trim()).length > 0
         ? form.sizes
             .filter((s) => s.size.trim())
@@ -178,7 +190,6 @@ export default function Products() {
       }
       setIsModalOpen(false)
       setImageFile(null)
-      setImagePreview(null)
       if (editingId) {
         await fetchProducts()
       } else {
@@ -219,6 +230,7 @@ export default function Products() {
           <p className="text-sm text-gray-500 mt-1">{meta.total} productos registrados</p>
         </div>
         <div className="flex items-center gap-3">
+          <CurrencyToggle value={currency} onChange={setCurrency} />
           <button
             onClick={() => setIsCartOpen(true)}
             className="relative flex items-center gap-2 px-4 py-2.5 bg-white text-gray-700 rounded-xl hover:bg-gray-50 transition-colors shadow-sm text-sm font-medium"
@@ -327,7 +339,7 @@ export default function Products() {
                   }
                 }}
                 title="Agregar al carrito"
-                className="hidden sm:flex p-2 rounded-xl hover:bg-violet-50 text-violet-500 transition-colors"
+                className="flex p-2 rounded-xl hover:bg-violet-50 text-violet-500 transition-colors"
               >
                 <ShoppingCart className="w-4 h-4" />
               </button>
@@ -388,9 +400,29 @@ export default function Products() {
                 required
                 type="text"
                 value={form.code}
+                disabled={autoGenerateCode}
                 onChange={(e) => setForm({ ...form, code: e.target.value })}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all"
+                className={`w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all ${autoGenerateCode ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
               />
+            </div>
+            <div className="flex items-end">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={autoGenerateCode}
+                  onChange={(e) => {
+                    const checked = e.target.checked
+                    setAutoGenerateCode(checked)
+                    if (checked) {
+                      setForm({ ...form, code: generateProductCode() })
+                    } else {
+                      setForm({ ...form, code: '' })
+                    }
+                  }}
+                  className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                />
+                <span className="text-sm text-gray-600">Autogenerar código</span>
+              </label>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Tipo *</label>
@@ -414,87 +446,11 @@ export default function Products() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Imagen</label>
-            <div
-              onDragOver={(e) => { e.preventDefault(); e.stopPropagation() }}
-              onDragLeave={(e) => { e.preventDefault(); e.stopPropagation() }}
-              onDrop={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                const file = e.dataTransfer.files?.[0]
-                if (file && file.type.startsWith('image/')) {
-                  setImageFile(file)
-                  setImagePreview(URL.createObjectURL(file))
-                }
-              }}
-              className={`relative flex flex-col items-center justify-center w-full min-h-[180px] rounded-2xl border-2 border-dashed transition-all cursor-pointer
-                ${imagePreview
-                  ? 'border-violet-300 bg-violet-50/30'
-                  : 'border-gray-200 bg-gray-50 hover:border-violet-300 hover:bg-violet-50/30'
-                }`}
-            >
-              {imagePreview ? (
-                <>
-                  <img
-                    src={imagePreview}
-                    alt="Preview"
-                    className="w-full h-40 rounded-xl object-contain"
-                  />
-                  <div className="flex items-center gap-3 mt-3">
-                    <label className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-violet-600 bg-violet-100 rounded-lg hover:bg-violet-200 transition-colors cursor-pointer">
-                      <Upload className="w-3.5 h-3.5" />
-                      Cambiar
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/webp,image/gif"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0]
-                          if (file) {
-                            setImageFile(file)
-                            setImagePreview(URL.createObjectURL(file))
-                          }
-                        }}
-                        className="hidden"
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setImageFile(null)
-                        setImagePreview(editingId ? form.image : null)
-                        setForm({ ...form, image: '' })
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-red-600 bg-red-100 rounded-lg hover:bg-red-200 transition-colors"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                      Eliminar
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <label className="flex flex-col items-center gap-2 w-full h-full p-6 cursor-pointer">
-                  <div className="w-12 h-12 rounded-full bg-violet-100 flex items-center justify-center">
-                    <Upload className="w-5 h-5 text-violet-500" />
-                  </div>
-                  <div className="text-center">
-                    <p className="text-sm font-medium text-gray-700">Arrastra una imagen aquí</p>
-                    <p className="text-xs text-gray-400 mt-0.5">o haz clic para seleccionar</p>
-                  </div>
-                  <p className="text-xs text-gray-400">JPG, PNG, WebP o GIF. Max 5MB.</p>
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        setImageFile(file)
-                        setImagePreview(URL.createObjectURL(file))
-                      }
-                    }}
-                    className="hidden"
-                  />
-                </label>
-              )}
-            </div>
+            <ProductImageInput
+              value={editingId ? form.image : null}
+              onChange={setImageFile}
+              onClearImage={() => setForm({ ...form, image: '' })}
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Categoría</label>
@@ -553,23 +509,23 @@ export default function Products() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Precio Compra</label>
-              <input
-                type="number"
-                min={0}
+              <MoneyInput
                 value={form.purchasePrice}
-                onChange={(e) => setForm({ ...form, purchasePrice: Number(e.target.value) })}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all"
+                onChange={(v) => setForm({ ...form, purchasePrice: v })}
               />
+              {vesOf(parseMoney(form.purchasePrice)) && (
+                <p className="text-xs text-gray-400 mt-1 tabular-nums">= {vesOf(parseMoney(form.purchasePrice))}</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">Precio Venta</label>
-              <input
-                type="number"
-                min={0}
+              <MoneyInput
                 value={form.salePrice}
-                onChange={(e) => setForm({ ...form, salePrice: Number(e.target.value) })}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all"
+                onChange={(v) => setForm({ ...form, salePrice: v })}
               />
+              {vesOf(parseMoney(form.salePrice)) && (
+                <p className="text-xs text-gray-400 mt-1 tabular-nums">= {vesOf(parseMoney(form.salePrice))}</p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -635,6 +591,17 @@ export default function Products() {
         ) : (
           <p className="text-sm text-gray-500 text-center py-4">Este producto no tiene tallas configuradas.</p>
         )}
+      </Modal>
+
+      <Modal
+        isOpen={!!selectedImage}
+        onClose={() => setSelectedImage(null)}
+        title="Vista previa de imagen"
+        size="md"
+      >
+        {selectedImage ? (
+          <img src={selectedImage} alt="Preview" className="w-full max-h-[70vh] object-contain rounded-xl" />
+        ) : null}
       </Modal>
 
       <Modal

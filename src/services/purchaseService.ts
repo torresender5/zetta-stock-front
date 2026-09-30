@@ -6,6 +6,7 @@ export interface CreatePurchaseDto {
   date: string
   items: PurchaseItem[]
   paymentStatus: 'paid' | 'pending'
+  fxRate?: number
 }
 
 export const purchaseService = {

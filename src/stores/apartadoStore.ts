@@ -40,10 +40,12 @@ interface ApartadoStore {
     id: string,
     amount: number,
     paymentMethod: PaymentMethod,
+    fxRate?: number,
   ) => Promise<{ ok: boolean; error?: string }>
   completeApartado: (
     id: string,
     paymentMethod: PaymentMethod,
+    fxRate?: number,
   ) => Promise<{ ok: boolean; error?: string }>
   cancelApartado: (
     id: string,
@@ -150,10 +152,10 @@ export const useApartadoStore = create<ApartadoStore>()((set, get) => ({
     }
   },
 
-  addPayment: async (id, amount, paymentMethod) => {
+  addPayment: async (id, amount, paymentMethod, fxRate) => {
     set({ loading: true, error: null })
     try {
-      await apartadoService.addPayment(id, { amount, paymentMethod })
+      await apartadoService.addPayment(id, { amount, paymentMethod, fxRate })
       set({ loading: false })
       await get().fetchApartadoById(id)
       await get().fetchApartados()
@@ -165,10 +167,10 @@ export const useApartadoStore = create<ApartadoStore>()((set, get) => ({
     }
   },
 
-  completeApartado: async (id, paymentMethod) => {
+  completeApartado: async (id, paymentMethod, fxRate) => {
     set({ loading: true, error: null })
     try {
-      await apartadoService.complete(id, { paymentMethod })
+      await apartadoService.complete(id, { paymentMethod, fxRate })
       set({ loading: false })
       await get().fetchApartadoById(id)
       await get().fetchApartados()

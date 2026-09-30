@@ -3,67 +3,70 @@ import { useNavigate } from 'react-router-dom'
 import { Search, Calendar, XCircle, Eye, CheckCircle, HandCoins } from 'lucide-react'
 import { usePurchaseStore } from '../stores/purchaseStore'
 import { purchaseService } from '../services/purchaseService'
-import { formatCurrency, formatDateOnly } from '../lib/utils'
+import { formatDateOnly } from '../lib/utils'
+import CurrencyToggle, { useDisplayCurrency } from '../components/CurrencyToggle'
 import DataTable from '../components/DataTable'
 import ActionDropdown from '../components/ActionDropdown'
 import type { Column } from '../components/DataTable/types'
 import type { Purchase, PaginationMeta } from '../types'
-
-const columns: Column<Purchase>[] = [
-  {
-    key: 'purchaseNumber',
-    header: 'N° Compra',
-    width: '8rem',
-    render: (p) =>
-      p.purchaseNumber ? (
-        <span className="font-mono font-medium text-blue-600">{p.purchaseNumber}</span>
-      ) : (
-        <span className="text-gray-300">—</span>
-      ),
-  },
-  {
-    key: 'supplier',
-    header: 'Proveedor',
-    cellClassName: 'font-medium text-gray-900',
-    truncate: true,
-    render: (p) => p.supplier?.name ?? 'Sin proveedor',
-  },
-  {
-    key: 'date',
-    header: 'Fecha',
-    hideBelow: 'sm',
-    cellClassName: 'text-gray-500',
-    render: (p) => formatDateOnly(p.date),
-  },
-  {
-    key: 'items',
-    header: 'Productos',
-    align: 'right',
-    hideBelow: 'md',
-    render: (p) => p.items.length,
-  },
-  {
-    key: 'subtotal',
-    header: 'Subtotal',
-    align: 'right',
-    hideBelow: 'lg',
-    render: (p) => formatCurrency(p.subtotal),
-  },
-  {
-    key: 'total',
-    header: 'Total',
-    align: 'right',
-    width: '6.5rem',
-    cellClassName: 'font-medium',
-    render: (p) => formatCurrency(p.total),
-  },
-]
 
 export default function AccountsPayable() {
   const updatePurchasePaymentStatus = usePurchaseStore(
     (s) => s.updatePurchasePaymentStatus,
   )
   const navigate = useNavigate()
+  const { currency, setCurrency, fmt } = useDisplayCurrency()
+
+  const columns: Column<Purchase>[] = [
+    {
+      key: 'purchaseNumber',
+      header: 'N° Compra',
+      width: '8rem',
+      render: (p) =>
+        p.purchaseNumber ? (
+          <span className="font-mono font-medium text-blue-600">{p.purchaseNumber}</span>
+        ) : (
+          <span className="text-gray-300">—</span>
+        ),
+    },
+    {
+      key: 'supplier',
+      header: 'Proveedor',
+      hideBelow: 'sm',
+      cellClassName: 'font-medium text-gray-900',
+      truncate: true,
+      render: (p) => p.supplier?.name ?? 'Sin proveedor',
+    },
+    {
+      key: 'date',
+      header: 'Fecha',
+      hideBelow: 'sm',
+      cellClassName: 'text-gray-500',
+      render: (p) => formatDateOnly(p.date),
+    },
+    {
+      key: 'items',
+      header: 'Productos',
+      align: 'right',
+      hideBelow: 'md',
+      render: (p) => p.items.length,
+    },
+    {
+      key: 'subtotal',
+      header: 'Subtotal',
+      align: 'right',
+      hideBelow: 'lg',
+      render: (p) => fmt(p.subtotal, p.subtotalVes),
+    },
+    {
+      key: 'total',
+      header: 'Total',
+      align: 'right',
+      width: '6.5rem',
+      cellClassName: 'font-medium',
+      render: (p) => fmt(p.total, p.totalVes),
+    },
+  ]
 
   const [rows, setRows] = useState<Purchase[]>([])
   const [meta, setMeta] = useState<PaginationMeta>({
@@ -159,9 +162,12 @@ export default function AccountsPayable() {
           <h1 className="text-2xl font-bold text-gray-900">Cuentas por Pagar</h1>
           <p className="text-sm text-gray-500 mt-1">{meta.total} compra(s) pendiente(s)</p>
         </div>
-        <div className="text-right">
-          <p className="text-sm text-gray-500">Total adeudado</p>
-          <p className="text-2xl font-bold text-orange-600">{formatCurrency(pendingTotal)}</p>
+        <div className="flex flex-col items-end gap-2">
+          <CurrencyToggle value={currency} onChange={setCurrency} />
+          <div className="text-right">
+            <p className="text-sm text-gray-500">Total adeudado</p>
+            <p className="text-2xl font-bold text-orange-600">{fmt(pendingTotal)}</p>
+          </div>
         </div>
       </div>
 

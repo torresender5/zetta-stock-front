@@ -9,6 +9,7 @@ interface ModalProps {
   title: string
   children: ReactNode
   size?: 'sm' | 'md' | 'lg' | 'xl'
+  loading?: boolean
 }
 
 const sizes = {
@@ -18,24 +19,24 @@ const sizes = {
   xl: 'max-w-4xl',
 }
 
-export default function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
+export default function Modal({ isOpen, onClose, title, children, size = 'md', loading = false }: ModalProps) {
 
   useEffect(() => {
     if (!isOpen) return
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && !loading) onClose()
     }
 
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [isOpen, onClose])
+  }, [isOpen, onClose, loading])
 
   if (!isOpen) return null
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center">
-      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-overlay-in" onClick={onClose} aria-hidden="true" />
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm animate-overlay-in" onClick={() => { if (!loading) onClose() }} aria-hidden="true" />
       <div
         role="dialog"
         aria-modal="true"
@@ -47,7 +48,8 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
           <button
             onClick={onClose}
             aria-label="Cerrar"
-            className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+            disabled={loading}
+            className="p-2 rounded-xl hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <X className="w-5 h-5" />
           </button>

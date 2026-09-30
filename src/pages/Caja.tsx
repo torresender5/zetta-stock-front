@@ -16,10 +16,14 @@ import {
   Coins,
   HandCoins,
   ChevronRight,
+  RefreshCw,
 } from 'lucide-react'
 import { useCajaStore } from '../stores/cajaStore'
-import { formatCurrency, formatDate } from '../lib/utils'
+import { useRateStore } from '../stores/rateStore'
+import { formatVes, formatDate, parseMoney } from '../lib/utils'
 import Modal from '../components/Modal'
+import MoneyInput from '../components/MoneyInput'
+import CurrencyToggle, { useDisplayCurrency } from '../components/CurrencyToggle'
 import { useNavigate } from 'react-router-dom'
 import type { CashMovement, PaymentMethod } from '../types'
 
@@ -103,20 +107,24 @@ export default function Caja() {
   const [openModal, setOpenModal] = useState(false)
   const [closeModal, setCloseModal] = useState(false)
   const [movementModal, setMovementModal] = useState(false)
-  const [baseAmount, setBaseAmount] = useState(0)
-  const [counts, setCounts] = useState<Record<PaymentMethod, number>>({
-    cash: 0,
-    card: 0,
-    transfer: 0,
-    credit: 0,
+  const [baseAmount, setBaseAmount] = useState('')
+  const [counts, setCounts] = useState<Record<PaymentMethod, string>>({
+    cash: '',
+    card: '',
+    transfer: '',
+    credit: '',
   })
   const [movementType, setMovementType] =
     useState<(typeof MOVEMENT_TYPES)[number]['value']>('expense')
   const [movementMethod, setMovementMethod] = useState<PaymentMethod>('cash')
-  const [movementAmount, setMovementAmount] = useState(0)
+  const [movementAmount, setMovementAmount] = useState('')
   const [movementDescription, setMovementDescription] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
+  const { currency, setCurrency, fmt, rate } = useDisplayCurrency()
+  const refreshRate = useRateStore((s) => s.refresh)
+
+  const vesOf = (usd: number) => (rate && rate > 0 ? formatVes(usd * rate) : null)
 
   useEffect(() => {
     fetchActive()
@@ -140,10 +148,13 @@ export default function Caja() {
   const difference = counted - expected
 
   const handleOpen = async () => {
-    if (baseAmount < 0 || submitting) return
+    if (parseMoney(baseAmount) < 0 || submitting || !rate) return
     setSubmitting(true)
     setActionError(null)
-    const result = await openRegister({ baseAmount })
+    const result = await openRegister({
+      baseAmount: parseMoney(baseAmount),
+      fxRate: rate ?? undefined,
+    })
     if (!result.ok) setActionError(result.error ?? 'Error al abrir la caja')
     setSubmitting(false)
     if (result.ok) setOpenModal(false)
@@ -153,7 +164,12 @@ export default function Caja() {
     if (submitting) return
     setSubmitting(true)
     setActionError(null)
-    const result = await closeRegister({ ...counts })
+    const result = await closeRegister({
+      cash: parseMoney(counts.cash),
+      card: parseMoney(counts.card),
+      transfer: parseMoney(counts.transfer),
+      credit: parseMoney(counts.credit),
+    })
     setSubmitting(false)
     if (result.ok) {
       setCloseModal(false)
@@ -164,19 +180,20 @@ export default function Caja() {
   }
 
   const handleAddMovement = async () => {
-    if (movementAmount <= 0 || submitting) return
+    if (parseMoney(movementAmount) <= 0 || submitting || !rate) return
     setSubmitting(true)
     setActionError(null)
     const result = await addMovement({
       type: movementType,
       paymentMethod: movementMethod,
-      amount: movementAmount,
+      amount: parseMoney(movementAmount),
       description: movementDescription.trim() || undefined,
+      fxRate: rate ?? undefined,
     })
     setSubmitting(false)
     if (result.ok) {
       setMovementModal(false)
-      setMovementAmount(0)
+      setMovementAmount('')
       setMovementDescription('')
       setMovementType('expense')
       setMovementMethod('cash')
@@ -225,14 +242,17 @@ export default function Caja() {
             Control de ingresos, egresos y arqueo por turno
           </p>
         </div>
-        {!active && (
-          <button
-            onClick={() => { setActionError(null); setOpenModal(true) }}
-            className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-2.5 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium"
-          >
-            <Plus className="w-4 h-4" /> Abrir caja
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          <CurrencyToggle value={currency} onChange={setCurrency} />
+          {!active && (
+            <button
+              onClick={() => { setActionError(null); setOpenModal(true) }}
+              className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-2.5 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium"
+            >
+              <Plus className="w-4 h-4" /> Abrir caja
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -275,7 +295,7 @@ export default function Caja() {
                   <p className="text-sm text-muted-foreground flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5" />
                     Abierta el {formatDate(active.openedAt)} · Base{' '}
-                    {formatCurrency(active.baseAmount)}
+                    {fmt(active.baseAmount, active.baseAmountVes)}
                   </p>
                 </div>
               </div>
@@ -289,10 +309,10 @@ export default function Caja() {
                 <button
                   onClick={() => {
                     setCounts({
-                      cash: Math.max(0, summary?.expectedByMethod?.cash ?? 0),
-                      card: Math.max(0, summary?.expectedByMethod?.card ?? 0),
-                      transfer: Math.max(0, summary?.expectedByMethod?.transfer ?? 0),
-                      credit: Math.max(0, summary?.expectedByMethod?.credit ?? 0),
+                      cash: String(Math.max(0, summary?.expectedByMethod?.cash ?? 0)),
+                      card: String(Math.max(0, summary?.expectedByMethod?.card ?? 0)),
+                      transfer: String(Math.max(0, summary?.expectedByMethod?.transfer ?? 0)),
+                      credit: String(Math.max(0, summary?.expectedByMethod?.credit ?? 0)),
                     })
                     setActionError(null)
                     setCloseModal(true)
@@ -315,7 +335,7 @@ export default function Caja() {
                   </div>
                   <p className="text-xs text-muted-foreground">{label}</p>
                   <p className="text-lg font-bold text-foreground mt-1 tabular-nums">
-                    {formatCurrency(value)}
+                    {fmt(value)}
                   </p>
                 </div>
               ))}
@@ -336,7 +356,7 @@ export default function Caja() {
                         {METHOD_LABELS[method]}
                       </p>
                       <p className="text-sm font-semibold text-gray-900 tabular-nums">
-                        {formatCurrency(total)}
+                        {fmt(total)}
                       </p>
                     </div>
                   </div>
@@ -396,7 +416,7 @@ export default function Caja() {
                       }`}
                     >
                       {m.amount > 0 ? '+' : ''}
-                      {formatCurrency(Math.abs(m.amount))}
+                      {fmt(Math.abs(m.amount), m.amountVes != null ? Math.abs(m.amountVes) : null)}
                     </span>
                   </div>
                 ))}
@@ -457,7 +477,7 @@ export default function Caja() {
                     {r.status === 'closed' && (
                       <div className="text-right shrink-0">
                         <p className="text-sm font-semibold text-gray-900 tabular-nums">
-                          {formatCurrency(r.expectedTotal ?? 0)}
+                          {fmt(r.expectedTotal ?? 0, r.expectedTotalVes ?? null)}
                         </p>
                         <p
                           className={`text-xs inline-flex items-center gap-1 ${
@@ -470,7 +490,7 @@ export default function Caja() {
                             <CheckCircle2 className="w-3 h-3" />
                           )}
                           {diff < 0 ? 'Faltante' : 'Sobrante'} de{' '}
-                          {formatCurrency(Math.abs(diff))}
+                          {fmt(Math.abs(diff), r.differenceVes != null ? Math.abs(r.differenceVes) : null)}
                         </p>
                       </div>
                     )}
@@ -495,32 +515,47 @@ export default function Caja() {
               {actionError}
             </div>
           )}
+          <div className="flex items-center justify-between gap-2 rounded-xl bg-blue-50 border border-blue-100 px-4 py-2.5">
+            <p className="flex items-center gap-2 text-sm text-blue-700">
+              <RefreshCw className="w-4 h-4" />
+              Tasa del día:
+              <span className="font-semibold tabular-nums">
+                {rate ? `1 US$ = ${formatVes(rate)}` : '—'}
+              </span>
+            </p>
+            <button
+              type="button"
+              onClick={() => refreshRate()}
+              className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg px-2 py-1 transition-colors"
+            >
+              Actualizar
+            </button>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">
               Monto base (apertura) *
             </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
-                $
-              </span>
-              <input
-                type="number"
-                min={0}
-                step={1}
-                required
-                value={baseAmount}
-                onChange={(e) => setBaseAmount(Number(e.target.value))}
-                className="w-full border border-gray-200 rounded-xl pl-8 pr-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all tabular-nums"
-                placeholder="0"
-              />
-            </div>
+            <MoneyInput
+              value={baseAmount}
+              onChange={setBaseAmount}
+            />
+            {vesOf(parseMoney(baseAmount)) && (
+              <p className="text-xs text-gray-400 mt-1 tabular-nums">
+                = {vesOf(parseMoney(baseAmount))}
+              </p>
+            )}
+            {!rate && (
+              <p className="text-xs text-red-600 mt-1.5">
+                No hay tasa de cambio disponible. Actualízala para registrar la caja.
+              </p>
+            )}
             <p className="text-xs text-gray-500 mt-1.5">
-              Dinero en efectivo con el que inicias el turno (COP).
+              Dinero en efectivo con el que inicias el turno.
             </p>
           </div>
           <button
             onClick={handleOpen}
-            disabled={baseAmount < 0 || submitting}
+            disabled={parseMoney(baseAmount) < 0 || submitting || !rate}
             className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-2.5 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium disabled:opacity-50"
           >
             {submitting ? 'Abriendo...' : 'Abrir caja'}
@@ -585,16 +620,15 @@ export default function Caja() {
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Monto *
               </label>
-              <input
-                type="number"
-                min={0}
-                step="100"
-                required
+              <MoneyInput
                 value={movementAmount}
-                onChange={(e) => setMovementAmount(Number(e.target.value))}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all tabular-nums"
-                placeholder="0"
+                onChange={setMovementAmount}
               />
+              {vesOf(parseMoney(movementAmount)) && (
+                <p className="text-xs text-gray-400 mt-1 tabular-nums">
+                  = {vesOf(parseMoney(movementAmount))}
+                </p>
+              )}
             </div>
           </div>
 
@@ -620,7 +654,7 @@ export default function Caja() {
             </button>
             <button
               onClick={handleAddMovement}
-              disabled={movementAmount <= 0 || submitting}
+              disabled={parseMoney(movementAmount) <= 0 || submitting || !rate}
               className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-5 py-2.5 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium disabled:opacity-50"
             >
               {submitting ? 'Registrando...' : 'Registrar'}
@@ -648,21 +682,16 @@ export default function Caja() {
                 <div key={method}>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-1.5">
                     <Icon className="w-3.5 h-3.5 text-gray-500" />
-                    {METHOD_LABELS[method]} (COP)
+                    {METHOD_LABELS[method]}
                   </label>
-                  <input
-                    type="number"
-                    min={0}
-                    step="100"
+                  <MoneyInput
                     value={counts[method]}
-                    onChange={(e) =>
+                    onChange={(v) =>
                       setCounts((c) => ({
                         ...c,
-                        [method]: Number(e.target.value),
+                        [method]: v,
                       }))
                     }
-                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all tabular-nums"
-                    placeholder="0"
                   />
                 </div>
               )
@@ -673,13 +702,13 @@ export default function Caja() {
             <div className="flex justify-between">
               <span className="text-gray-600">Total esperado</span>
               <span className="font-semibold tabular-nums">
-                {formatCurrency(expected)}
+                {fmt(expected, summary?.expectedTotalVes ?? null)}
               </span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Total contado</span>
               <span className="font-semibold tabular-nums">
-                {formatCurrency(counted)}
+                {fmt(counted, summary?.countedTotalVes ?? null)}
               </span>
             </div>
             <div
@@ -696,7 +725,7 @@ export default function Caja() {
                 {difference < 0 ? 'Faltante' : 'Sobrante'}
               </span>
               <span className="tabular-nums">
-                {formatCurrency(Math.abs(difference))}
+                {fmt(Math.abs(difference), summary?.differenceVes != null ? Math.abs(summary.differenceVes) : null)}
               </span>
             </div>
           </div>

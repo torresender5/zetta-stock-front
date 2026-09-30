@@ -18,7 +18,8 @@ import {
   User,
 } from 'lucide-react'
 import { cashRegisterService } from '../services/cajaService'
-import { formatCurrency, formatDate } from '../lib/utils'
+import { formatDate } from '../lib/utils'
+import CurrencyToggle, { useDisplayCurrency } from '../components/CurrencyToggle'
 import type {
   CashMovement,
   CashRegister,
@@ -92,6 +93,7 @@ function getErrorMessage(err: unknown, fallback: string): string {
 
 export default function CashRegisterDetails() {
   const { id } = useParams<{ id: string }>()
+  const { currency, setCurrency, fmt } = useDisplayCurrency()
   const [register, setRegister] = useState<CashRegister | null>(null)
   const [summary, setSummary] = useState<CashRegisterSummary | null>(null)
   const [loading, setLoading] = useState(true)
@@ -255,11 +257,12 @@ export default function CashRegisterDetails() {
           <span className="bg-white/20 px-3 py-1 rounded-full text-xs font-semibold shrink-0">
             Cerrada
           </span>
+          <CurrencyToggle value={currency} onChange={setCurrency} className="bg-white/20 border-white/30" />
         </div>
         <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 text-sm text-white/90">
           <span>Abierta {formatDate(register.openedAt)}</span>
           <span>
-            Base {formatCurrency(register.baseAmount)}
+            Base {fmt(register.baseAmount, register.baseAmountVes)}
           </span>
           <span>
             {summary?.movementCount ?? movements.length} movimientos
@@ -267,7 +270,7 @@ export default function CashRegisterDetails() {
           <span className="inline-flex items-center gap-1">
             {isSobrante ? <CheckCircle2 className="w-3.5 h-3.5" /> : <AlertTriangle className="w-3.5 h-3.5" />}
             {isSobrante ? 'Sobrante' : 'Faltante'} de{' '}
-            {formatCurrency(Math.abs(diff))}
+            {fmt(Math.abs(diff), register.differenceVes != null ? Math.abs(register.differenceVes) : null)}
           </span>
         </div>
       </div>
@@ -283,7 +286,7 @@ export default function CashRegisterDetails() {
             </div>
             <p className="text-xs text-muted-foreground">{label}</p>
             <p className="text-lg font-bold text-foreground mt-1 tabular-nums">
-              {formatCurrency(value)}
+              {fmt(value)}
             </p>
           </div>
         ))}
@@ -307,11 +310,11 @@ export default function CashRegisterDetails() {
               </div>
               <p className="text-xs text-muted-foreground">Esperado</p>
               <p className="text-base font-bold text-foreground tabular-nums">
-                {formatCurrency(expectedM)}
+                {fmt(expectedM)}
               </p>
               <p className="text-xs text-muted-foreground mt-2">Ventas</p>
               <p className="text-sm font-semibold text-emerald-600 tabular-nums">
-                {formatCurrency(salesM)}
+                {fmt(salesM)}
               </p>
             </div>
           )
@@ -371,7 +374,7 @@ export default function CashRegisterDetails() {
                     }`}
                   >
                     {m.amount > 0 ? '+' : ''}
-                    {formatCurrency(Math.abs(m.amount))}
+                    {fmt(Math.abs(m.amount), m.amountVes != null ? Math.abs(m.amountVes) : null)}
                   </span>
                   <p className="text-xs text-gray-400">
                     {formatDate(m.createdAt)}

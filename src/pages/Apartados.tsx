@@ -11,19 +11,25 @@ import {
   HandCoins,
   Search,
   Calendar,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react'
 import { useProductStore } from '../stores/productStore'
 import { useClientStore } from '../stores/clientStore'
 import { useApartadoStore } from '../stores/apartadoStore'
+import { useRateStore } from '../stores/rateStore'
 import {
-  formatCurrency,
+  formatVes,
   formatDateOnly,
   TAX_RATE,
   todayLocal,
+  parseMoney,
 } from '../lib/utils'
 import Modal from '../components/Modal'
 import ActionDropdown from '../components/ActionDropdown'
 import DataTable from '../components/DataTable'
+import MoneyInput from '../components/MoneyInput'
+import CurrencyToggle, { useDisplayCurrency } from '../components/CurrencyToggle'
 import { ProductSelect } from '../components/ProductSelect'
 import { ClientSelect } from '../components/ClientSelect'
 import type { Column } from '../components/DataTable/types'
@@ -62,71 +68,6 @@ const statusBadge = (status: Apartado['status']) => {
   )
 }
 
-const columns: Column<Apartado>[] = [
-  {
-    key: 'apartadoNumber',
-    header: 'N° Apartado',
-    width: '8rem',
-    render: (a) => (
-      <span className="font-mono font-medium text-violet-600">
-        {a.apartadoNumber}
-      </span>
-    ),
-  },
-  {
-    key: 'client',
-    header: 'Cliente',
-    truncate: true,
-    cellClassName: 'font-medium text-gray-900',
-    render: (a) => a.client?.name ?? '—',
-  },
-  {
-    key: 'date',
-    header: 'Fecha',
-    hideBelow: 'sm',
-    cellClassName: 'text-gray-500',
-    render: (a) => formatDateOnly(a.date),
-  },
-  {
-    key: 'dueDate',
-    header: 'Vence',
-    hideBelow: 'lg',
-    cellClassName: 'text-gray-500',
-    render: (a) => (a.dueDate ? formatDateOnly(a.dueDate) : '—'),
-  },
-  {
-    key: 'total',
-    header: 'Total',
-    align: 'right',
-    hideBelow: 'sm',
-    render: (a) => formatCurrency(a.total),
-  },
-  {
-    key: 'totalPaid',
-    header: 'Abonado',
-    align: 'right',
-    hideBelow: 'md',
-    cellClassName: 'text-emerald-600',
-    render: (a) => formatCurrency(a.totalPaid),
-  },
-  {
-    key: 'balance',
-    header: 'Saldo',
-    align: 'right',
-    width: '7rem',
-    cellClassName: 'font-medium',
-    render: (a) => formatCurrency(Math.max(a.total - a.totalPaid, 0)),
-  },
-  {
-    key: 'status',
-    header: 'Estado',
-    align: 'right',
-    hideBelow: 'sm',
-    width: '6.5rem',
-    render: (a) => statusBadge(a.status),
-  },
-]
-
 const FILTERS: { value: '' | Apartado['status']; label: string }[] = [
   { value: '', label: 'Todos' },
   { value: 'active', label: 'Activos' },
@@ -158,6 +99,76 @@ export default function Apartados() {
     createApartado,
   } = useApartadoStore()
   const navigate = useNavigate()
+  const { currency, setCurrency, fmt, rate } = useDisplayCurrency()
+  const refreshRate = useRateStore((s) => s.refresh)
+
+  const vesOf = (usd: number) => (rate && rate > 0 ? formatVes(usd * rate) : null)
+
+  const columns: Column<Apartado>[] = [
+    {
+      key: 'apartadoNumber',
+      header: 'N° Apartado',
+      width: '8rem',
+      render: (a) => (
+        <span className="font-mono font-medium text-violet-600">
+          {a.apartadoNumber}
+        </span>
+      ),
+    },
+    {
+      key: 'client',
+      header: 'Cliente',
+      hideBelow: 'sm',
+      truncate: true,
+      cellClassName: 'font-medium text-gray-900',
+      render: (a) => a.client?.name ?? '—',
+    },
+    {
+      key: 'date',
+      header: 'Fecha',
+      hideBelow: 'sm',
+      cellClassName: 'text-gray-500',
+      render: (a) => formatDateOnly(a.date),
+    },
+    {
+      key: 'dueDate',
+      header: 'Vence',
+      hideBelow: 'lg',
+      cellClassName: 'text-gray-500',
+      render: (a) => (a.dueDate ? formatDateOnly(a.dueDate) : '—'),
+    },
+    {
+      key: 'total',
+      header: 'Total',
+      align: 'right',
+      render: (a) => fmt(a.total, a.totalVes),
+    },
+    {
+      key: 'totalPaid',
+      header: 'Abonado',
+      align: 'right',
+      hideBelow: 'md',
+      cellClassName: 'text-emerald-600',
+      render: (a) => fmt(a.totalPaid, a.totalPaidVes),
+    },
+    {
+      key: 'balance',
+      header: 'Saldo',
+      align: 'right',
+      hideBelow: 'sm',
+      width: '7rem',
+      cellClassName: 'font-medium',
+      render: (a) => fmt(Math.max(a.total - a.totalPaid, 0)),
+    },
+    {
+      key: 'status',
+      header: 'Estado',
+      align: 'right',
+      hideBelow: 'sm',
+      width: '6.5rem',
+      render: (a) => statusBadge(a.status),
+    },
+  ]
 
   const [searchInput, setSearchInput] = useState(search)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -165,7 +176,7 @@ export default function Apartados() {
   const [date, setDate] = useState(todayLocal())
   const [dueDate, setDueDate] = useState('')
   const [notes, setNotes] = useState('')
-  const [initialPayment, setInitialPayment] = useState(0)
+  const [initialPayment, setInitialPayment] = useState('')
   const [initialPaymentMethod, setInitialPaymentMethod] =
     useState<PaymentMethod>('cash')
   const [items, setItems] = useState<ApartadoItem[]>([])
@@ -259,14 +270,14 @@ export default function Apartados() {
   const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0)
   const tax = Math.round(subtotal * TAX_RATE)
   const total = subtotal + tax
-  const balance = Math.max(total - (Number(initialPayment) || 0), 0)
+  const balance = Math.max(total - parseMoney(initialPayment), 0)
 
   const resetForm = () => {
     setClientId('')
     setDate(todayLocal())
     setDueDate('')
     setNotes('')
-    setInitialPayment(0)
+    setInitialPayment('')
     setInitialPaymentMethod('cash')
     setItems([])
     setDraftProductId('')
@@ -278,7 +289,7 @@ export default function Apartados() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (items.length === 0 || !clientId || submitting) return
-    if (Number(initialPayment) > total) {
+    if (parseMoney(initialPayment) > total) {
       setFormError('El anticipo no puede superar el total')
       return
     }
@@ -289,8 +300,9 @@ export default function Apartados() {
       date,
       dueDate: dueDate || undefined,
       notes: notes.trim() || undefined,
-      initialPayment: Number(initialPayment) || 0,
+      initialPayment: parseMoney(initialPayment),
       initialPaymentMethod,
+      fxRate: rate ?? undefined,
       items: items.map((i) => ({
         productId: i.productId,
         quantity: i.quantity,
@@ -316,15 +328,18 @@ export default function Apartados() {
             {meta.total} apartados registrados
           </p>
         </div>
-        <button
-          onClick={() => {
-            resetForm()
-            setIsModalOpen(true)
-          }}
-          className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-2.5 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium"
-        >
-          <Plus className="w-4 h-4" /> Nuevo Apartado
-        </button>
+        <div className="flex items-center gap-3">
+          <CurrencyToggle value={currency} onChange={setCurrency} />
+          <button
+            onClick={() => {
+              resetForm()
+              setIsModalOpen(true)
+            }}
+            className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-2.5 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium"
+          >
+            <Plus className="w-4 h-4" /> Nuevo Apartado
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-3 mb-3">
@@ -538,7 +553,7 @@ export default function Apartados() {
                         {item.size ? ` · ${item.size}` : ''}
                       </p>
                       <p className="text-xs text-gray-500">
-                        {formatCurrency(item.unitPrice)} c/u
+                        {fmt(item.unitPrice)} c/u
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5">
@@ -561,7 +576,7 @@ export default function Apartados() {
                       </button>
                     </div>
                     <span className="w-24 text-right text-sm font-medium tabular-nums">
-                      {formatCurrency(item.subtotal)}
+                      {fmt(item.subtotal)}
                     </span>
                     <button
                       type="button"
@@ -580,16 +595,11 @@ export default function Apartados() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Anticipo (COP)
+                Anticipo
               </label>
-              <input
-                type="number"
-                min={0}
-                step={1}
+              <MoneyInput
                 value={initialPayment}
-                onChange={(e) => setInitialPayment(Number(e.target.value))}
-                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm tabular-nums"
-                placeholder="0"
+                onChange={setInitialPayment}
               />
             </div>
             <div>
@@ -627,19 +637,19 @@ export default function Apartados() {
           <div className="rounded-xl bg-gray-50 p-4 space-y-1.5 text-sm">
             <div className="flex justify-between text-gray-600">
               <span>Subtotal</span>
-              <span className="tabular-nums">{formatCurrency(subtotal)}</span>
+              <span className="tabular-nums">{fmt(subtotal, rate ? subtotal * rate : null)}</span>
             </div>
             <div className="flex justify-between text-gray-600">
               <span>IVA (19%)</span>
-              <span className="tabular-nums">{formatCurrency(tax)}</span>
+              <span className="tabular-nums">{fmt(tax, rate ? tax * rate : null)}</span>
             </div>
             <div className="flex justify-between font-semibold text-gray-900 border-t border-gray-200 pt-1.5">
               <span>Total</span>
-              <span className="tabular-nums">{formatCurrency(total)}</span>
+              <span className="tabular-nums">{fmt(total, rate ? total * rate : null)}</span>
             </div>
             <div className="flex justify-between font-semibold text-violet-600">
               <span>Saldo pendiente</span>
-              <span className="tabular-nums">{formatCurrency(balance)}</span>
+              <span className="tabular-nums">{fmt(balance, rate ? balance * rate : null)}</span>
             </div>
           </div>
 

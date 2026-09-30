@@ -26,7 +26,8 @@ import {
 import { useAuthStore } from '../stores/authStore'
 import { can } from '../lib/permissions'
 import type { ViewKey } from '../lib/permissions'
-import { formatCurrency, formatDate, todayLocal } from '../lib/utils'
+import { formatDate, todayLocal } from '../lib/utils'
+import CurrencyToggle, { useDisplayCurrency } from '../components/CurrencyToggle'
 import { reportService } from '../services/reportService'
 import type {
   ReportFilters,
@@ -154,12 +155,12 @@ const statusBadge = (active: boolean, onLabel: string, offLabel: string) => (
   </span>
 )
 
-function MethodBadge({ total, method }: { total: number | undefined; method: string }) {
+function MethodBadge({ total, method, fmt }: { total: number | undefined; method: string; fmt: (usd: number, ves?: number | null) => string }) {
   return (
     <div className="flex items-center justify-between py-2 px-3 rounded-xl bg-muted/50">
       <span className="text-sm font-medium text-foreground capitalize">{method}</span>
       <span className="text-sm font-semibold text-foreground tabular-nums">
-        {formatCurrency(total ?? 0)}
+        {fmt(total ?? 0)}
       </span>
     </div>
   )
@@ -173,6 +174,7 @@ interface Stats {
 
 export default function Reports() {
   const role = useAuthStore((s) => s.user?.role)
+  const { currency, setCurrency, fmt } = useDisplayCurrency()
   const [activeTab, setActiveTab] = useState<TabId>('ventas')
   const [startDate, setStartDate] = useState<string>(() => {
     const date = new Date()
@@ -276,9 +278,9 @@ export default function Reports() {
         const s = sales
         return [
           { label: 'Ventas', value: s ? String(s.totalCount) : '—' },
-          { label: 'Ingresos', value: s ? formatCurrency(s.totalSales) : '—', highlight: true },
-          { label: 'Subtotal', value: s ? formatCurrency(s.subtotal) : '—' },
-          { label: 'IVA (19%)', value: s ? formatCurrency(s.tax) : '—' },
+          { label: 'Ingresos', value: s ? fmt(s.totalSales) : '—', highlight: true },
+          { label: 'Subtotal', value: s ? fmt(s.subtotal) : '—' },
+          { label: 'IVA (19%)', value: s ? fmt(s.tax) : '—' },
         ]
       }
       case 'productos': {
@@ -287,16 +289,16 @@ export default function Reports() {
         return [
           { label: 'Productos vendidos', value: String(products.length), highlight: true },
           { label: 'Unidades', value: String(totalUnits) },
-          { label: 'Ingresos generados', value: formatCurrency(totalRevenue) },
+          { label: 'Ingresos generados', value: fmt(totalRevenue) },
         ]
       }
       case 'compras': {
         const p = purchases
         return [
           { label: 'Compras', value: p ? String(p.totalCount) : '—' },
-          { label: 'Total compras', value: p ? formatCurrency(p.totalPurchases) : '—', highlight: true },
-          { label: 'Subtotal', value: p ? formatCurrency(p.subtotal) : '—' },
-          { label: 'IVA', value: p ? formatCurrency(p.tax) : '—' },
+          { label: 'Total compras', value: p ? fmt(p.totalPurchases) : '—', highlight: true },
+          { label: 'Subtotal', value: p ? fmt(p.subtotal) : '—' },
+          { label: 'IVA', value: p ? fmt(p.tax) : '—' },
         ]
       }
       case 'stock': {
@@ -304,7 +306,7 @@ export default function Reports() {
         return [
           { label: 'Total artículos', value: inv ? String(inv.totalItems) : '—' },
           { label: 'Total unidades', value: inv ? String(inv.totalStock) : '—' },
-          { label: 'Valor en costos', value: inv ? formatCurrency(inv.totalStockValue) : '—' },
+          { label: 'Valor en costos', value: inv ? fmt(inv.totalStockValue) : '—' },
           { label: 'Stock bajo', value: inv ? String(inv.lowStockCount) : '—', highlight: inv?.lowStockCount ? inv.lowStockCount > 0 : false },
         ]
       }
@@ -314,23 +316,23 @@ export default function Reports() {
         const sum = diffs.reduce((a, b) => a + b, 0)
         return [
           { label: 'Cierres', value: c ? String(c.count) : '—' },
-          { label: 'Diferencia acumulada', value: c ? formatCurrency(sum) : '—', highlight: sum !== 0 },
+          { label: 'Diferencia acumulada', value: c ? fmt(sum) : '—', highlight: sum !== 0 },
         ]
       }
       case 'porCobrar':
         return [
           { label: 'Clientes con saldo', value: receivables ? String(receivables.rows.length) : '—' },
-          { label: 'Total por cobrar', value: receivables ? formatCurrency(receivables.total) : '—', highlight: true },
+          { label: 'Total por cobrar', value: receivables ? fmt(receivables.total) : '—', highlight: true },
         ]
       case 'porPagar':
         return [
           { label: 'Proveedores con saldo', value: payables ? String(payables.rows.length) : '—' },
-          { label: 'Total por pagar', value: payables ? formatCurrency(payables.total) : '—', highlight: true },
+          { label: 'Total por pagar', value: payables ? fmt(payables.total) : '—', highlight: true },
         ]
       case 'apartados':
         return [
           { label: 'Apartados activos', value: apartados ? String(apartados.totalActive) : '—' },
-          { label: 'Saldo pendiente', value: apartados ? formatCurrency(apartados.totalBalance) : '—', highlight: true },
+          { label: 'Saldo pendiente', value: apartados ? fmt(apartados.totalBalance) : '—', highlight: true },
         ]
       default:
         return []
@@ -361,7 +363,7 @@ export default function Reports() {
                     <ChartTooltip
                       contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
                       formatter={(value, name) => [
-                        name === 'count' ? `${value} ventas` : formatCurrency(Number(value)),
+                        name === 'count' ? `${value} ventas` : fmt(Number(value)),
                         name === 'count' ? 'Ventas' : 'Total',
                       ]}
                     />
@@ -378,7 +380,7 @@ export default function Reports() {
                   {methods.length === 0 ? (
                     <p className="text-sm text-muted-foreground">Sin datos</p>
                   ) : (
-                    methods.map(([method, total]) => <MethodBadge key={method} method={method} total={total} />)
+                    methods.map(([method, total]) => <MethodBadge key={method} method={method} total={total} fmt={fmt} />)
                   )}
                 </div>
               </div>
@@ -386,7 +388,7 @@ export default function Reports() {
                 <h3 className="text-sm font-semibold text-muted-foreground mb-4">Ingresos por estado</h3>
                 <div className="space-y-2">
                   {Object.entries(s.byPaymentStatus ?? {}).map(([status, total]) => (
-                    <MethodBadge key={status} method={status} total={total} />
+                    <MethodBadge key={status} method={status} total={total} fmt={fmt} />
                   ))}
                 </div>
               </div>
@@ -399,9 +401,9 @@ export default function Reports() {
                 columns={[
                   { header: 'Fecha', render: (r) => formatDate(r.date) },
                   { header: 'Ventas', align: 'right', render: (r) => r.count },
-                  { header: 'Subtotal', align: 'right', render: (r) => formatCurrency(r.subtotal) },
-                  { header: 'IVA', align: 'right', render: (r) => formatCurrency(r.tax) },
-                  { header: 'Total', align: 'right', render: (r) => <span className="font-semibold">{formatCurrency(r.total)}</span> },
+                  { header: 'Subtotal', align: 'right', render: (r) => fmt(r.subtotal) },
+                  { header: 'IVA', align: 'right', render: (r) => fmt(r.tax) },
+                  { header: 'Total', align: 'right', render: (r) => <span className="font-semibold">{fmt(r.total)}</span> },
                 ]}
                 rows={s.byPeriod}
               />
@@ -449,7 +451,7 @@ export default function Reports() {
                   { header: '#', render: (_r, i) => <span className="font-semibold text-muted-foreground">{i + 1}</span> },
                   { header: 'Producto', render: (r) => r.name },
                   { header: 'Unidades', align: 'right', render: (r) => r.quantity },
-                  { header: 'Ingresos', align: 'right', render: (r) => formatCurrency(r.revenue) },
+                  { header: 'Ingresos', align: 'right', render: (r) => fmt(r.revenue) },
                 ]}
                 rows={products}
               />
@@ -470,7 +472,7 @@ export default function Reports() {
                 { header: 'Producto', render: (r) => r.name },
                 { header: 'Código', render: (r) => <span className="text-muted-foreground">{r.code}</span> },
                 { header: 'Stock', align: 'right', render: (r) => r.stock },
-                { header: 'Valor en costos', align: 'right', render: (r) => formatCurrency(r.stockValue) },
+                { header: 'Valor en costos', align: 'right', render: (r) => fmt(r.stockValue) },
                 { header: 'Estado', render: (r) => statusBadge(!r.lowStock, 'OK', r.stock === 0 ? 'Sin stock' : 'Stock bajo') },
               ]}
               rows={inv.products}
@@ -491,7 +493,7 @@ export default function Reports() {
                     <p className="text-sm text-muted-foreground">Sin datos</p>
                   )}
                   {Object.entries(p.byPaymentStatus ?? {}).map(([status, total]) => (
-                    <MethodBadge key={status} method={status} total={total} />
+                    <MethodBadge key={status} method={status} total={total} fmt={fmt} />
                   ))}
                 </div>
               </div>
@@ -504,7 +506,7 @@ export default function Reports() {
                   {p.bySupplier.map((r) => (
                     <div key={r.supplierId} className="flex items-center justify-between py-2 px-3 rounded-xl bg-muted/50">
                       <span className="text-sm font-medium text-foreground">{r.supplier}</span>
-                      <span className="text-sm font-semibold text-foreground tabular-nums">{formatCurrency(r.total)}</span>
+                      <span className="text-sm font-semibold text-foreground tabular-nums">{fmt(r.total)}</span>
                     </div>
                   ))}
                 </div>
@@ -526,9 +528,9 @@ export default function Reports() {
                 { header: 'Caja', render: (r) => r.name },
                 { header: 'Usuario', render: (r) => <span className="text-muted-foreground">{r.user}</span> },
                 { header: 'Apertura', render: (r) => formatDate(r.openedAt) },
-                { header: 'Esperado', align: 'right', render: (r) => formatCurrency(r.expectedTotal) },
-                { header: 'Contado', align: 'right', render: (r) => formatCurrency(r.countedTotal) },
-                { header: 'Diferencia', align: 'right', render: (r) => <span className={r.difference === 0 ? '' : r.difference > 0 ? 'text-emerald-600 font-semibold' : 'text-red-600 font-semibold'}>{formatCurrency(r.difference)}</span> },
+                { header: 'Esperado', align: 'right', render: (r) => fmt(r.expectedTotal) },
+                { header: 'Contado', align: 'right', render: (r) => fmt(r.countedTotal) },
+                { header: 'Diferencia', align: 'right', render: (r) => <span className={r.difference === 0 ? '' : r.difference > 0 ? 'text-emerald-600 font-semibold' : 'text-red-600 font-semibold'}>{fmt(r.difference)}</span> },
                 { header: 'Estado', render: (r) => statusBadge(r.status === 'closed', 'Cerrada', 'Abierta') },
               ]}
               rows={c.cashRegisters}
@@ -551,11 +553,11 @@ export default function Reports() {
               columns={[
                 { header: activeTab === 'porCobrar' ? 'Cliente' : 'Proveedor', render: (r) => r.name },
                 { header: 'Facturas', align: 'right', render: (r) => r.pendingCount },
-                { header: 'Hoy - 30d', align: 'right', render: (r) => formatCurrency(r.current) },
-                { header: '31 - 60d', align: 'right', render: (r) => formatCurrency(r.days30) },
-                { header: '61 - 90d', align: 'right', render: (r) => formatCurrency(r.days60) },
-                { header: '+90d', align: 'right', render: (r) => formatCurrency(r.days90) },
-                { header: 'Total', align: 'right', render: (r) => <span className="font-semibold">{formatCurrency(r.total)}</span> },
+                { header: 'Hoy - 30d', align: 'right', render: (r) => fmt(r.current) },
+                { header: '31 - 60d', align: 'right', render: (r) => fmt(r.days30) },
+                { header: '61 - 90d', align: 'right', render: (r) => fmt(r.days60) },
+                { header: '+90d', align: 'right', render: (r) => fmt(r.days90) },
+                { header: 'Total', align: 'right', render: (r) => <span className="font-semibold">{fmt(r.total)}</span> },
               ]}
               rows={rows.rows}
             />
@@ -575,9 +577,9 @@ export default function Reports() {
                 { header: 'Nº', render: (r) => r.apartadoNumber },
                 { header: 'Cliente', render: (r) => r.client },
                 { header: 'Fecha', render: (r) => formatDate(r.date) },
-                { header: 'Total', align: 'right', render: (r) => formatCurrency(r.total) },
-                { header: 'Pagado', align: 'right', render: (r) => formatCurrency(r.totalPaid) },
-                { header: 'Saldo', align: 'right', render: (r) => <span className="font-semibold">{formatCurrency(r.balance)}</span> },
+                { header: 'Total', align: 'right', render: (r) => fmt(r.total) },
+                { header: 'Pagado', align: 'right', render: (r) => fmt(r.totalPaid) },
+                { header: 'Saldo', align: 'right', render: (r) => <span className="font-semibold">{fmt(r.balance)}</span> },
                 { header: 'Estado', render: (r) => statusBadge(r.status === 'paid', 'Liquidado', 'Activo') },
               ]}
               rows={a.rows}
@@ -600,11 +602,14 @@ export default function Reports() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-foreground">Reportes</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          Analiza el desempeño de tu negocio y exporta los informes
-        </p>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Reportes</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            Analiza el desempeño de tu negocio y exporta los informes
+          </p>
+        </div>
+        <CurrencyToggle value={currency} onChange={setCurrency} />
       </div>
 
       <div className="flex flex-wrap gap-2" role="tablist" aria-label="Tipos de reporte">

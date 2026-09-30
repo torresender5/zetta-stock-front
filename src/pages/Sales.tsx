@@ -1,13 +1,17 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Minus, Trash2, FileText, CheckCircle, Clock, XCircle, ShoppingBag, AlertTriangle, Info, Search, Calendar } from 'lucide-react'
+import { Plus, Minus, Trash2, FileText, CheckCircle, Clock, XCircle, ShoppingBag, AlertTriangle, Info, Search, Calendar, RefreshCw } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useProductStore } from '../stores/productStore'
 import { useClientStore } from '../stores/clientStore'
 import { useSaleStore } from '../stores/saleStore'
-import { formatCurrency, formatDateOnly, TAX_RATE, todayLocal } from '../lib/utils'
+import { useRateStore } from '../stores/rateStore'
+import { formatVes, formatDateOnly, TAX_RATE, todayLocal, parseMoney } from '../lib/utils'
 import Modal from '../components/Modal'
+import FullScreenLoader from '../components/FullScreenLoader'
 import ActionDropdown from '../components/ActionDropdown'
 import DataTable from '../components/DataTable'
+import MoneyInput from '../components/MoneyInput'
+import CurrencyToggle, { useDisplayCurrency } from '../components/CurrencyToggle'
 import { ProductSelect } from '../components/ProductSelect'
 import { ClientSelect } from '../components/ClientSelect'
 import type { Column } from '../components/DataTable/types'
@@ -44,34 +48,6 @@ const statusBadge = (status: Sale['paymentStatus']) => {
   )
 }
 
-const columns: Column<Sale>[] = [
-  {
-    key: 'saleNumber',
-    header: 'N° Venta',
-    width: '7rem',
-    render: (s) =>
-      s.saleNumber ? (
-        <span className="font-mono font-medium text-blue-600">{s.saleNumber}</span>
-      ) : (
-        <span className="text-gray-300">—</span>
-      ),
-  },
-  { key: 'clientName', header: 'Cliente', cellClassName: 'font-medium text-gray-900', truncate: true },
-  { key: 'date', header: 'Fecha', hideBelow: 'sm', cellClassName: 'text-gray-500', render: (s) => formatDateOnly(s.date) },
-  { key: 'items', header: 'Productos', align: 'right', hideBelow: 'md', render: (s) => s.items.length },
-  { key: 'subtotal', header: 'Subtotal', align: 'right', hideBelow: 'lg', render: (s) => formatCurrency(s.subtotal) },
-  { key: 'tax', header: 'IVA', align: 'right', hideBelow: 'xl', render: (s) => formatCurrency(s.tax) },
-  { key: 'total', header: 'Total', align: 'right', width: '6.5rem', cellClassName: 'font-medium', render: (s) => formatCurrency(s.total) },
-  {
-    key: 'paymentStatus',
-    header: 'Estado',
-    align: 'right',
-    hideBelow: 'sm',
-    width: '6rem',
-    render: (s) => statusBadge(s.paymentStatus ?? 'pending'),
-  },
-]
-
 export default function Sales() {
   const { products, fetchAllProducts } = useProductStore()
   const { fetchClients } = useClientStore()
@@ -82,12 +58,14 @@ export default function Sales() {
     setSearch, setPaymentStatusFilter, setStartDateFilter, setEndDateFilter,
   } = useSaleStore()
   const navigate = useNavigate()
+  const { currency, setCurrency, fmt, rate } = useDisplayCurrency()
+  const refreshRate = useRateStore((s) => s.refresh)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [clientId, setClientId] = useState('')
   const [date, setDate] = useState(todayLocal())
   const [paymentStatus, setPaymentStatus] = useState<'paid' | 'pending'>('paid')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
-  const [receivedAmount, setReceivedAmount] = useState(0)
+  const [receivedAmount, setReceivedAmount] = useState('')
   const [items, setItems] = useState<SaleItem[]>([])
   const [draftProductId, setDraftProductId] = useState('')
   const [pendingProduct, setPendingProduct] = useState<Product | null>(null)
@@ -95,11 +73,43 @@ export default function Sales() {
   const [pendingQty, setPendingQty] = useState(1)
   const [cancelSale, setCancelSale] = useState<Sale | null>(null)
   const [cancelReason, setCancelReason] = useState('')
-  const [refundAmount, setRefundAmount] = useState(0)
+  const [refundAmount, setRefundAmount] = useState('')
   const [refundMethod, setRefundMethod] = useState(REFUND_METHODS[0])
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
+  const [creating, setCreating] = useState(false)
+  const creatingRef = useRef(false)
   const [searchInput, setSearchInput] = useState(search)
+
+  const vesOf = (usd: number) => (rate && rate > 0 ? formatVes(usd * rate) : null)
+
+  const columns: Column<Sale>[] = [
+    {
+      key: 'saleNumber',
+      header: 'N° Venta',
+      width: '7rem',
+      render: (s) =>
+        s.saleNumber ? (
+          <span className="font-mono font-medium text-blue-600">{s.saleNumber}</span>
+        ) : (
+          <span className="text-gray-300">—</span>
+        ),
+    },
+    { key: 'clientName', header: 'Cliente', hideBelow: 'sm', cellClassName: 'font-medium text-gray-900', truncate: true },
+    { key: 'date', header: 'Fecha', hideBelow: 'sm', cellClassName: 'text-gray-500', render: (s) => formatDateOnly(s.date) },
+    { key: 'items', header: 'Productos', align: 'right', hideBelow: 'md', render: (s) => s.items.length },
+    { key: 'subtotal', header: 'Subtotal', align: 'right', hideBelow: 'lg', render: (s) => fmt(s.subtotal, s.subtotalVes) },
+    { key: 'tax', header: 'IVA', align: 'right', hideBelow: 'xl', render: (s) => fmt(s.tax, s.taxVes) },
+    { key: 'total', header: 'Total', align: 'right', width: '6.5rem', cellClassName: 'font-medium', render: (s) => fmt(s.total, s.totalVes) },
+    {
+      key: 'paymentStatus',
+      header: 'Estado',
+      align: 'right',
+      hideBelow: 'sm',
+      width: '6rem',
+      render: (s) => statusBadge(s.paymentStatus ?? 'pending'),
+    },
+  ]
 
   useEffect(() => {
     fetchAllProducts()
@@ -182,7 +192,11 @@ export default function Sales() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (items.length === 0 || !clientId) return
+    if (items.length === 0) return
+    if (!rate || rate <= 0) return
+    if (creatingRef.current) return
+    creatingRef.current = true
+    setCreating(true)
     try {
       await addSale(
         clientId,
@@ -191,25 +205,29 @@ export default function Sales() {
         paymentStatus,
         paymentStatus === 'paid' ? paymentMethod : 'credit',
         paymentStatus === 'paid' && paymentMethod === 'cash'
-          ? Number(receivedAmount) || 0
+          ? parseMoney(receivedAmount)
           : undefined,
+        rate,
       )
       setIsModalOpen(false)
       setClientId('')
       setPaymentStatus('paid')
       setPaymentMethod('cash')
-      setReceivedAmount(0)
+      setReceivedAmount('')
       setItems([])
       setDraftProductId('')
     } catch {
       // error se maneja en el store
+    } finally {
+      creatingRef.current = false
+      setCreating(false)
     }
   }
 
   const openCancelModal = (s: Sale) => {
     setCancelSale(s)
     setCancelReason('')
-    setRefundAmount(s.total)
+    setRefundAmount(String(s.total))
     setRefundMethod(REFUND_METHODS[0])
   }
 
@@ -224,7 +242,7 @@ export default function Sales() {
         cancelSale.id,
         'cancelled',
         cancelReason.trim(),
-        wasPaid ? Number(refundAmount) || 0 : undefined,
+        wasPaid ? parseMoney(refundAmount) : undefined,
         wasPaid ? refundMethod : undefined,
       )
       setCancelSale(null)
@@ -245,9 +263,12 @@ export default function Sales() {
           <h1 className="text-2xl font-bold text-gray-900">Ventas</h1>
           <p className="text-sm text-gray-500 mt-1">{salesMeta.total} ventas registradas</p>
         </div>
-        <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-2.5 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium">
-          <Plus className="w-4 h-4" /> Nueva Venta
-        </button>
+        <div className="flex items-center gap-3">
+          <CurrencyToggle value={currency} onChange={setCurrency} />
+          <button onClick={() => setIsModalOpen(true)} className="flex items-center gap-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-2.5 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium">
+            <Plus className="w-4 h-4" /> Nueva Venta
+          </button>
+        </div>
       </div>
 
       {error && (
@@ -372,11 +393,39 @@ export default function Sales() {
         )}
       />
 
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Nueva Venta" size="xl">
+      <FullScreenLoader loading={creating} text="Registrando venta..." />
+
+      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Nueva Venta" size="xl" loading={creating}>
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="flex items-center justify-between gap-2 rounded-xl bg-blue-50 border border-blue-100 px-4 py-2.5">
+            <p className="flex items-center gap-2 text-sm text-blue-700">
+              <RefreshCw className="w-4 h-4" />
+              Tasa del día:
+              <span className="font-semibold tabular-nums">
+                {rate ? `1 US$ = ${formatVes(rate)}` : '—'}
+              </span>
+            </p>
+            <button
+              type="button"
+              onClick={() => refreshRate()}
+              className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded-lg px-2 py-1 transition-colors"
+            >
+              Actualizar
+            </button>
+          </div>
+
+          {!rate && (
+            <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-100 rounded-xl text-sm text-red-700">
+              <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+              <span>
+                No hay una tasa de cambio disponible. Actualiza la tasa para poder registrar la venta.
+              </span>
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Cliente *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Cliente (opcional)</label>
               <ClientSelect value={clientId} onChange={setClientId} />
             </div>
             <div>
@@ -433,24 +482,29 @@ export default function Sales() {
               </div>
 
               {paymentMethod === 'cash' && (
-                <div className="mt-4 grid grid-cols-2 gap-4">
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Recibido (COP)</label>
-                    <input
-                      type="number"
-                      min={0}
-                      step="100"
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Recibido</label>
+                    <MoneyInput
                       value={receivedAmount}
-                      onChange={(e) => setReceivedAmount(Number(e.target.value))}
-                      className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all tabular-nums"
-                      placeholder="0"
+                      onChange={setReceivedAmount}
                     />
+                    {vesOf(parseMoney(receivedAmount)) && (
+                      <p className="text-xs text-gray-400 mt-1 tabular-nums">
+                        = {vesOf(parseMoney(receivedAmount))}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1.5">Vuelto</label>
                     <div className="w-full border border-gray-200 rounded-xl px-4 py-2.5 bg-gray-50 text-sm font-semibold tabular-nums">
-                      {receivedAmount > total ? formatCurrency(receivedAmount - total) : formatCurrency(0)}
+                      {parseMoney(receivedAmount) > total ? fmt(parseMoney(receivedAmount) - total) : fmt(0)}
                     </div>
+                    {vesOf(Math.max(0, parseMoney(receivedAmount) - total)) && (
+                      <p className="text-xs text-gray-400 mt-1 tabular-nums">
+                        = {vesOf(Math.max(0, parseMoney(receivedAmount) - total))}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
@@ -506,7 +560,7 @@ export default function Sales() {
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-gray-500">{formatCurrency(item.unitPrice)} c/u · Stock: {max}</p>
+                          <p className="text-xs text-gray-500">{fmt(item.unitPrice)} c/u · Stock: {max}</p>
                         </div>
                       </div>
                       <div className="flex items-center justify-between sm:justify-end gap-3">
@@ -532,7 +586,7 @@ export default function Sales() {
                           </button>
                         </div>
                         <p className="text-sm font-semibold text-violet-600 tabular-nums w-24 text-right sm:text-left">
-                          {formatCurrency(item.subtotal)}
+                          {fmt(item.subtotal)}
                         </p>
                         <button
                           type="button"
@@ -550,16 +604,16 @@ export default function Sales() {
             )}
 
           <div className="bg-gray-50 rounded-xl p-4 space-y-1 text-sm">
-            <div className="flex justify-between"><span>Subtotal:</span><span>{formatCurrency(subtotal)}</span></div>
-            <div className="flex justify-between text-gray-500"><span>IVA (19%):</span><span>{formatCurrency(tax)}</span></div>
-            <div className="flex justify-between text-lg font-bold border-t pt-2"><span>Total:</span><span>{formatCurrency(total)}</span></div>
+            <div className="flex justify-between"><span>Subtotal:</span><span>{fmt(subtotal, rate ? subtotal * rate : null)}</span></div>
+            <div className="flex justify-between text-gray-500"><span>IVA (19%):</span><span>{fmt(tax, rate ? tax * rate : null)}</span></div>
+            <div className="flex justify-between text-lg font-bold border-t pt-2"><span>Total:</span><span>{fmt(total, rate ? total * rate : null)}</span></div>
           </div>
 
           <div className="flex flex-col sm:flex-row justify-end gap-3">
-            <button type="button" onClick={() => setIsModalOpen(false)} className="bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors text-sm font-medium px-4 py-2.5">Cancelar</button>
-            <button type="submit" disabled={items.length === 0 || !clientId}
-              className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-2.5 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium disabled:opacity-50">
-              Registrar Venta
+            <button type="button" onClick={() => setIsModalOpen(false)} disabled={creating} className="bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors text-sm font-medium px-4 py-2.5 disabled:opacity-50 disabled:cursor-not-allowed">Cancelar</button>
+            <button type="submit" disabled={items.length === 0 || !rate || creating}
+              className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-2.5 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+              {creating ? 'Registrando...' : 'Registrar Venta'}
             </button>
           </div>
         </form>
@@ -582,7 +636,7 @@ export default function Sales() {
               )}
               <div className="min-w-0">
                 <p className="font-medium text-gray-900 truncate">{pendingProduct.name}</p>
-                <p className="text-sm text-gray-500">{pendingProduct.code} · {formatCurrency(pendingProduct.salePrice)} c/u</p>
+                <p className="text-sm text-gray-500">{pendingProduct.code} · {fmt(pendingProduct.salePrice)} c/u</p>
               </div>
             </div>
 
@@ -653,7 +707,7 @@ export default function Sales() {
 
             <div className="bg-gray-50 rounded-xl p-4 flex justify-between items-center">
               <span className="text-sm text-gray-600">Subtotal</span>
-              <span className="text-lg font-bold text-gray-900 tabular-nums">{formatCurrency(pendingProduct.salePrice * pendingQty)}</span>
+              <span className="text-lg font-bold text-gray-900 tabular-nums">{fmt(pendingProduct.salePrice * pendingQty)}</span>
             </div>
 
             <div className="flex justify-end gap-3 pt-1">
@@ -682,7 +736,7 @@ export default function Sales() {
           {cancelSale && (
             <div className="space-y-1 text-sm">
               <p className="font-medium text-gray-900">{cancelSale.clientName}</p>
-              <p className="text-gray-500">Total: <span className="font-semibold text-gray-900">{formatCurrency(cancelSale.total)}</span></p>
+              <p className="text-gray-500">Total: <span className="font-semibold text-gray-900">{fmt(cancelSale.total, cancelSale.totalVes)}</span></p>
               <p className="text-gray-500">Estado actual: {statusBadge(cancelSale.paymentStatus ?? 'pending')}</p>
             </div>
           )}
@@ -702,13 +756,10 @@ export default function Sales() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">Monto a reembolsar *</label>
-                  <input
-                    type="number"
-                    min={0}
+                  <MoneyInput
                     required
                     value={refundAmount}
-                    onChange={(e) => setRefundAmount(Number(e.target.value))}
-                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all"
+                    onChange={setRefundAmount}
                   />
                 </div>
                 <div>
