@@ -9,7 +9,7 @@ export function encodeBasic(email: string, password: string): string {
 }
 
 export function getAdminSession(): AdminSession | null {
-  const raw = localStorage.getItem(ADMIN_AUTH_KEY)
+  const raw = sessionStorage.getItem(ADMIN_AUTH_KEY)
   if (!raw) return null
   try {
     const decoded = atob(raw)
@@ -22,13 +22,16 @@ export function getAdminSession(): AdminSession | null {
 }
 
 export function isAdminAuthenticated(): boolean {
-  return !!localStorage.getItem(ADMIN_AUTH_KEY)
+  return !!sessionStorage.getItem(ADMIN_AUTH_KEY)
 }
 
 export function saveAdminSession(email: string, password: string): void {
-  localStorage.setItem(ADMIN_AUTH_KEY, encodeBasic(email, password))
+  // sessionStorage: las credenciales Basic no persisten tras cerrar la pestaña.
+  sessionStorage.setItem(ADMIN_AUTH_KEY, encodeBasic(email, password))
 }
 
 export function clearAdminSession(): void {
+  sessionStorage.removeItem(ADMIN_AUTH_KEY)
+  // Limpieza de claves antiguas que se guardaban en localStorage.
   localStorage.removeItem(ADMIN_AUTH_KEY)
 }

@@ -3,7 +3,8 @@ import { Plus, Search, Edit, Trash2, ShoppingCart, ShoppingBag, Package, ImageIc
 import { useProductStore } from '../stores/productStore'
 import { useCartStore } from '../stores/cartStore'
 import { useRateStore } from '../stores/rateStore'
-import { formatVes, CATEGORIES, parseMoney, generateProductCode } from '../lib/utils'
+import { formatVes, parseMoney, generateProductCode } from '../lib/utils'
+import { useCategoryStore } from '../stores/categoryStore'
 import Modal from '../components/Modal'
 import ActionDropdown from '../components/ActionDropdown'
 import CartPanel from '../components/CartPanel'
@@ -21,7 +22,8 @@ const emptyForm = {
   code: '',
   type: '',
   sku: '',
-  category: CATEGORIES[0],
+  category: '',
+  categoryId: null as string | null,
   purchasePrice: '',
   salePrice: '',
   stock: 0,
@@ -37,6 +39,14 @@ export default function Products() {
     addProduct, updateProduct, deleteProduct,
   } = useProductStore()
   const cartStore = useCartStore()
+  const {
+    categories, fetchCategories, addCategory, updateCategory, deleteCategory,
+  } = useCategoryStore()
+  const [isManageOpen, setIsManageOpen] = useState(false)
+  const [showNewCategory, setShowNewCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [categoryError, setCategoryError] = useState<string | null>(null)
+  const [renameValues, setRenameValues] = useState<Record<string, string>>({})
   const { currency, setCurrency, fmt } = useDisplayCurrency()
   const rate = useRateStore((s) => s.rate)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -110,7 +120,14 @@ export default function Products() {
 
   useEffect(() => {
     fetchProducts()
+    fetchCategories()
   }, [])
+
+  useEffect(() => {
+    if (categories.length > 0 && !form.category) {
+      setForm((f) => (f.category ? f : { ...f, category: categories[0].name, categoryId: categories[0].id }))
+    }
+  }, [categories])
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -150,6 +167,7 @@ export default function Products() {
       type: product.type,
       sku: product.sku,
       category: product.category,
+      categoryId: product.categoryId ?? null,
       purchasePrice: String(product.purchasePrice),
       salePrice: String(product.salePrice),
       stock: product.stock,
@@ -200,6 +218,54 @@ export default function Products() {
     } finally {
       submittingRef.current = false
       setSubmitting(false)
+    }
+  }
+
+  const handleCreateCategory = async () => {
+    const name = newCategoryName.trim()
+    if (!name) return
+    setCategoryError(null)
+    const res = await addCategory(name)
+    if (res.ok && res.category) {
+      const created = res.category
+      setForm((f) => ({ ...f, category: created.name, categoryId: created.id }))
+      setShowNewCategory(false)
+      setNewCategoryName('')
+    } else {
+      setCategoryError(res.error ?? 'Error al crear categoría')
+    }
+  }
+
+  const openManageCategories = () => {
+    setRenameValues(Object.fromEntries(categories.map((c) => [c.id, c.name])))
+    setCategoryError(null)
+    setIsManageOpen(true)
+  }
+
+  const handleRenameCategory = async (id: string) => {
+    const old = categories.find((c) => c.id === id)
+    const name = (renameValues[id] ?? '').trim()
+    if (!old || !name || name === old.name) return
+    setCategoryError(null)
+    const res = await updateCategory(id, name)
+    if (res.ok) {
+      setForm((f) => (f.categoryId === id ? { ...f, category: name } : f))
+    } else {
+      setCategoryError(res.error ?? 'Error al actualizar categoría')
+      setRenameValues((r) => ({ ...r, [id]: old.name }))
+    }
+  }
+
+  const handleDeleteCategory = async (id: string) => {
+    const cat = categories.find((c) => c.id === id)
+    if (!cat) return
+    if (!window.confirm(`¿Eliminar la categoría "${cat.name}"?`)) return
+    setCategoryError(null)
+    const res = await deleteCategory(id)
+    if (res.ok) {
+      setForm((f) => (f.categoryId === id ? { ...f, category: '', categoryId: null } : f))
+    } else {
+      setCategoryError(res.error ?? 'Error al eliminar categoría')
     }
   }
 
@@ -269,8 +335,8 @@ export default function Products() {
           className="bg-white border-0 rounded-xl px-4 py-2.5 shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm transition-all"
         >
           <option value="">Todas las categorías</option>
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>{c}</option>
+          {categories.map((c) => (
+            <option key={c.id} value={c.name}>{c.name}</option>
           ))}
         </select>
       </div>
@@ -453,14 +519,70 @@ export default function Products() {
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Categoría</label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-sm font-medium text-gray-700">Categoría</label>
+              <button
+                type="button"
+                onClick={openManageCategories}
+                className="text-xs font-medium text-violet-600 hover:text-violet-700 transition-colors"
+              >
+                Gestionar
+              </button>
+            </div>
             <select
+              required
               value={form.category}
-              onChange={(e) => setForm({ ...form, category: e.target.value })}
+              onChange={(e) => {
+                const name = e.target.value
+                const cat = categories.find((c) => c.name === name)
+                setForm({ ...form, category: name, categoryId: cat ? cat.id : null })
+              }}
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all"
             >
-              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
+              {categories.length === 0 && <option value="">Cargando categorías...</option>}
+              {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
             </select>
+            <div className="mt-2">
+              {showNewCategory ? (
+                <div className="flex items-center gap-2">
+                  <input
+                    autoFocus
+                    type="text"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateCategory() } }}
+                    placeholder="Nombre de la nueva categoría"
+                    className="flex-1 border border-gray-200 rounded-xl px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleCreateCategory}
+                    disabled={!newCategoryName.trim()}
+                    className="px-3 py-1.5 bg-violet-600 text-white rounded-xl hover:bg-violet-700 transition-colors text-xs font-medium disabled:opacity-50"
+                  >
+                    Guardar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowNewCategory(false); setNewCategoryName(''); setCategoryError(null) }}
+                    className="px-3 py-1.5 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors text-xs font-medium"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowNewCategory(true)}
+                  className="flex items-center gap-1 text-xs font-medium text-violet-600 hover:text-violet-700 transition-colors"
+                >
+                  <Plus className="w-3.5 h-3.5" /> Nueva categoría
+                </button>
+              )}
+              {categoryError && !isManageOpen && (
+                <p className="text-xs text-red-500 mt-1">{categoryError}</p>
+              )}
+            </div>
           </div>
           <div>
             <div className="flex items-center justify-between mb-1.5">
@@ -558,6 +680,50 @@ export default function Products() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal isOpen={isManageOpen} onClose={() => setIsManageOpen(false)} title="Gestionar categorías" size="md">
+        {categoryError && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm">{categoryError}</div>
+        )}
+        {categories.length === 0 ? (
+          <p className="text-sm text-gray-500 text-center py-4">No hay categorías todavía.</p>
+        ) : (
+          <div className="space-y-2">
+            {categories.map((c) => {
+              const value = renameValues[c.id] ?? c.name
+              const changed = value.trim() !== c.name && value.trim().length > 0
+              return (
+                <div key={c.id} className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl">
+                  <input
+                    type="text"
+                    value={value}
+                    onChange={(e) => setRenameValues((r) => ({ ...r, [c.id]: e.target.value }))}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleRenameCategory(c.id) }}
+                    className="flex-1 border border-gray-200 rounded-xl px-3 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all"
+                  />
+                  <span className="hidden sm:inline text-xs font-mono text-gray-400 shrink-0">{c.code}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRenameCategory(c.id)}
+                    disabled={!changed}
+                    className="px-3 py-1.5 bg-violet-600 text-white rounded-xl hover:bg-violet-700 transition-colors text-xs font-medium disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                  >
+                    Renombrar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleDeleteCategory(c.id)}
+                    className="p-2 rounded-xl hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                    title="Eliminar categoría"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </Modal>
 
       <Modal

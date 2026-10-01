@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { Purchase, PurchaseItem, PaginationMeta } from '../types'
-import { purchaseService } from '../services/purchaseService'
+import { purchaseService, type UpdatePurchaseDto } from '../services/purchaseService'
 import { useProductStore } from './productStore'
 
 const emptyMeta: PaginationMeta = { total: 0, page: 1, limit: 10, totalPages: 1 }
@@ -35,6 +35,8 @@ interface PurchaseStore {
     fxRate?: number,
   ) => Promise<void>
   updatePurchasePaymentStatus: (id: string, status: 'paid' | 'pending') => Promise<void>
+  updatePurchase: (id: string, purchase: UpdatePurchaseDto) => Promise<void>
+  deletePurchase: (id: string) => Promise<void>
 }
 
 export const usePurchaseStore = create<PurchaseStore>()((set, get) => ({
@@ -152,6 +154,36 @@ export const usePurchaseStore = create<PurchaseStore>()((set, get) => ({
     } catch {
       set({ error: 'Error al actualizar estado de pago', loading: false })
       throw new Error('Error al actualizar estado de pago')
+    }
+  },
+
+  updatePurchase: async (id, purchase) => {
+    set({ loading: true, error: null })
+    try {
+      const updated = await purchaseService.update(id, purchase)
+      set((state) => ({
+        purchases: state.purchases.map((p) => (p.id === id ? updated : p)),
+        purchase: state.purchase?.id === id ? updated : state.purchase,
+        loading: false,
+      }))
+    } catch {
+      set({ error: 'Error al actualizar compra', loading: false })
+      throw new Error('Error al actualizar compra')
+    }
+  },
+
+  deletePurchase: async (id) => {
+    set({ loading: true, error: null })
+    try {
+      await purchaseService.remove(id)
+      // El API revierte el stock en transacción; solo refrescamos productos
+      const { fetchAllProducts } = useProductStore.getState()
+      await fetchAllProducts()
+      set({ loading: false })
+      await get().fetchPurchases()
+    } catch {
+      set({ error: 'Error al eliminar compra', loading: false })
+      throw new Error('Error al eliminar compra')
     }
   },
 }))

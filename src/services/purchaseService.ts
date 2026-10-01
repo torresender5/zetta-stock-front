@@ -9,6 +9,12 @@ export interface CreatePurchaseDto {
   fxRate?: number
 }
 
+export interface UpdatePurchaseDto {
+  supplierId?: string
+  date?: string
+  paymentStatus?: 'paid' | 'pending'
+}
+
 export const purchaseService = {
   getAll: async (params: PurchaseQueryParams = {}): Promise<PaginatedResponse<Purchase>> => {
     const { data } = await api.get<PaginatedResponse<Purchase>>('/purchases', { params })
@@ -25,8 +31,18 @@ export const purchaseService = {
     return data
   },
 
+  update: async (id: string, purchase: UpdatePurchaseDto): Promise<Purchase> => {
+    const { data } = await api.patch<Purchase>(`/purchases/${id}`, purchase)
+    return data
+  },
+
   updatePaymentStatus: async (id: string, status: 'paid' | 'pending'): Promise<Purchase> => {
     const { data } = await api.patch<Purchase>(`/purchases/${id}`, { paymentStatus: status })
+    return data
+  },
+
+  remove: async (id: string): Promise<Purchase> => {
+    const { data } = await api.delete<Purchase>(`/purchases/${id}`)
     return data
   },
 }

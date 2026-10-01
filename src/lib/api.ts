@@ -12,9 +12,9 @@ const api = axios.create({
 })
 
 api.interceptors.request.use((config) => {
-  const adminAuth = localStorage.getItem('admin-auth')
+  // Sesión de superadmin (Basic Auth contra UserAdmin): solo en sessionStorage.
+  const adminAuth = sessionStorage.getItem('admin-auth')
   if (adminAuth) {
-    // Sesión de superadmin (Basic Auth contra UserAdmin)
     config.headers.Authorization = `Basic ${adminAuth}`
     return config
   }

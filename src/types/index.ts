@@ -32,11 +32,21 @@ export interface Product {
   type: string
   sku: string
   category: string
+  categoryId?: string | null
   purchasePrice: number
   salePrice: number
   stock: number
   image?: string | null
   sizes?: ProductSize[] | null
+  createdAt: string
+}
+
+export interface Category {
+  id: string
+  companyId?: string | null
+  name: string
+  code: string
+  description?: string | null
   createdAt: string
 }
 
@@ -176,6 +186,7 @@ export interface Sale {
   receivedAmountVes?: number | null
   changeAmountVes?: number | null
   refundAmountVes?: number | null
+  notes?: string | null
   invoice?: Invoice | null
   createdAt: string
 }

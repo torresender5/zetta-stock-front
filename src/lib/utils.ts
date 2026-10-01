@@ -92,14 +92,3 @@ export function parseMoney(value: string): number {
 }
 
 export const TAX_RATE = 0.19 // IVA 19%
-
-export const CATEGORIES = [
-  'Electrónica',
-  'Ropa',
-  'Alimentos',
-  'Hogar',
-  'Salud',
-  'Deportes',
-  'Belleza',
-  'Otros',
-]

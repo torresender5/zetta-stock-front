@@ -10,11 +10,17 @@ import {
   FileText,
   Hash,
   ImageIcon,
+  Loader2,
   Mail,
   MapPin,
   Package,
+  Pencil,
   Phone,
+  Plus,
   Receipt,
+  Save,
+  StickyNote,
+  Trash2,
   User,
   XCircle,
 } from 'lucide-react'
@@ -22,8 +28,17 @@ import { useSaleStore } from '../stores/saleStore'
 import { useProductStore } from '../stores/productStore'
 import { formatDate, formatDateOnly } from '../lib/utils'
 import CurrencyToggle, { useDisplayCurrency } from '../components/CurrencyToggle'
+import { ClientSelect } from '../components/ClientSelect'
+import { ProductSelect } from '../components/ProductSelect'
 import Modal from '../components/Modal'
-import type { Sale, Product } from '../types'
+import type { Sale, SaleItem, Product, PaymentMethod } from '../types'
+
+const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
+  { value: 'cash', label: 'Efectivo' },
+  { value: 'card', label: 'Tarjeta' },
+  { value: 'transfer', label: 'Transferencia' },
+  { value: 'credit', label: 'Crédito' },
+]
 
 const statusConfig = {
   paid: {
@@ -90,11 +105,26 @@ function DetailRow({ label, value, bold = false }: { label: string; value: strin
 export default function SaleDetails() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { sale, loading, error, fetchSaleById } = useSaleStore()
+  const { sale, loading, error, fetchSaleById, updateSale } = useSaleStore()
   const { products, fetchAllProducts } = useProductStore()
   const { currency, setCurrency, fmt } = useDisplayCurrency()
   const [notFound, setNotFound] = useState(false)
   const [previewProductId, setPreviewProductId] = useState<string | null>(null)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [editClientId, setEditClientId] = useState('')
+  const [editDate, setEditDate] = useState('')
+  const [editMethod, setEditMethod] = useState<PaymentMethod>('cash')
+  const [editItems, setEditItems] = useState<SaleItem[]>([])
+  const [editError, setEditError] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [addProductId, setAddProductId] = useState('')
+  const [notes, setNotes] = useState('')
+  const [notesError, setNotesError] = useState<string | null>(null)
+  const [savingNotes, setSavingNotes] = useState(false)
+
+  useEffect(() => {
+    if (sale) setNotes(sale.notes ?? '')
+  }, [sale?.id])
 
   useEffect(() => {
     if (!id) return
@@ -153,6 +183,118 @@ export default function SaleDetails() {
   const saleDate = new Date(sale.date)
   const safeDate = isNaN(saleDate.getTime()) ? new Date(sale.createdAt) : saleDate
 
+  const stockOf = (productId: string, size?: string): number => {
+    const p = products.find((x) => x.id === productId)
+    if (!p) return Number.MAX_SAFE_INTEGER
+    if (size && p.sizes && p.sizes.length > 0) {
+      const s = p.sizes.find((x) => x.size === size)
+      return s?.stock ?? 0
+    }
+    return p.stock
+  }
+
+  const openEdit = () => {
+    setEditClientId(sale.clientId ? String(sale.clientId) : '')
+    setEditDate(sale.date ? sale.date.slice(0, 10) : '')
+    setEditMethod(sale.paymentMethod ?? 'cash')
+    setEditItems(sale.items.map((i) => ({ ...i })))
+    setEditError(null)
+    setAddProductId('')
+    setIsEditOpen(true)
+  }
+
+  const updateEditItem = (index: number, field: 'quantity' | 'unitPrice', raw: number) => {
+    setEditItems((items) =>
+      items.map((it, i) => {
+        if (i !== index) return it
+        const max = stockOf(it.productId, it.size)
+        let value = raw
+        if (field === 'quantity') value = Math.max(1, Math.min(raw, max))
+        else value = Math.max(0, raw)
+        const next = { ...it, [field]: value } as SaleItem
+        next.subtotal = Math.round(next.quantity * next.unitPrice * 100) / 100
+        return next
+      })
+    )
+  }
+
+  const removeEditItem = (index: number) => {
+    setEditItems((items) => items.filter((_, i) => i !== index))
+  }
+
+  const addEditRow = (productId: string) => {
+    setAddProductId('')
+    if (!productId) return
+    const p = products.find((x) => x.id === productId)
+    if (!p) return
+    const size =
+      p.sizes && p.sizes.length > 0
+        ? (p.sizes.find((s) => (s.stock ?? 0) > 0)?.size ?? p.sizes[0].size)
+        : undefined
+    setEditItems((items) => {
+      const idx = items.findIndex((it) => it.productId === productId && it.size === size)
+      if (idx >= 0) {
+        return items.map((it, i) => {
+          if (i !== idx) return it
+          const quantity = Math.min(it.quantity + 1, stockOf(productId, size))
+          return { ...it, quantity, subtotal: Math.round(quantity * it.unitPrice * 100) / 100 }
+        })
+      }
+      return [
+        ...items,
+        {
+          productId,
+          productName: p.name,
+          size,
+          quantity: 1,
+          unitPrice: p.salePrice,
+          subtotal: Math.round(p.salePrice * 100) / 100,
+        },
+      ]
+    })
+  }
+
+  const editSubtotal = editItems.reduce((sum, it) => sum + it.quantity * it.unitPrice, 0)
+  const editTax = editSubtotal * 0.19
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (editItems.length === 0) {
+      setEditError('Debe haber al menos un producto en la venta.')
+      return
+    }
+    if (editItems.some((it) => it.quantity < 1)) {
+      setEditError('Revisa las cantidades de cada producto.')
+      return
+    }
+    setSaving(true)
+    setEditError(null)
+    const res = await updateSale(sale.id, {
+      clientId: editClientId || undefined,
+      date: editDate,
+      paymentMethod: editMethod,
+      items: editItems.map((it) => ({
+        productId: it.productId,
+        productName: it.productName,
+        ...(it.size ? { size: it.size } : {}),
+        quantity: it.quantity,
+        unitPrice: it.unitPrice,
+        subtotal: Math.round(it.quantity * it.unitPrice * 100) / 100,
+      })),
+    })
+    setSaving(false)
+    if (res.ok) setIsEditOpen(false)
+    else setEditError(res.error ?? 'Error al actualizar la venta')
+  }
+
+  const handleSaveNotes = async () => {
+    setSavingNotes(true)
+    setNotesError(null)
+    const res = await updateSale(sale.id, { notes })
+    setSavingNotes(false)
+    if (!res.ok) setNotesError(res.error ?? 'Error al guardar las notas')
+  }
+
   return (
     <div className="max-w-6xl mx-auto">
       <Link
@@ -183,7 +325,17 @@ export default function SaleDetails() {
                   <CalendarDays className="w-4 h-4" /> {formatDateOnly(safeDate)}
                 </span>
               </div>
-              <CurrencyToggle value={currency} onChange={setCurrency} />
+              <div className="flex items-center gap-3">
+                {sale.paymentStatus === 'pending' && (
+                  <button
+                    onClick={openEdit}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/15 hover:bg-white/25 text-sm font-medium transition-colors"
+                  >
+                    <Pencil className="w-4 h-4" /> Editar
+                  </button>
+                )}
+                <CurrencyToggle value={currency} onChange={setCurrency} />
+              </div>
             </div>
           </div>
           <span className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold self-start sm:self-auto bg-white text-gray-900 shadow-lg`}>
@@ -300,6 +452,31 @@ export default function SaleDetails() {
           </Card>
 
           <Card>
+            <CardHeader icon={<StickyNote className="w-4 h-4" />} title="Notas" />
+            <div className="px-6 py-4 space-y-2">
+              <textarea
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                rows={4}
+                placeholder="Observaciones de la venta (editable en cualquier estado)..."
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all resize-y"
+              />
+              {notesError && <p className="text-xs text-red-500">{notesError}</p>}
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={handleSaveNotes}
+                  disabled={savingNotes || notes === (sale.notes ?? '')}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-violet-600 to-indigo-600 text-white rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none"
+                >
+                  {savingNotes ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  Guardar
+                </button>
+              </div>
+            </div>
+          </Card>
+
+          <Card>
             <CardHeader icon={<FileText className="w-4 h-4" />} title="Factura asociada" />
             <div className="px-6 py-5">
               {sale.invoice ? (
@@ -334,6 +511,144 @@ export default function SaleDetails() {
           </div>
         </div>
       </div>
+
+      <Modal
+        isOpen={isEditOpen}
+        onClose={() => setIsEditOpen(false)}
+        title={`Editar venta ${sale.saleNumber ?? ''}`}
+        size="xl"
+      >
+        <form onSubmit={handleEditSubmit} className="space-y-4">
+          <div className="rounded-xl bg-amber-50 border border-amber-100 px-4 py-2.5 text-sm text-amber-700">
+            Solo se permite editar ventas <span className="font-semibold">pendientes por cobrar</span>. Al guardar,
+            el stock y la factura se recalculan automáticamente.
+          </div>
+
+          {editError && (
+            <div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm">{editError}</div>
+          )}
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Cliente</label>
+              <ClientSelect value={editClientId} onChange={setEditClientId} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Fecha *</label>
+              <input
+                required
+                type="date"
+                value={editDate}
+                onChange={(e) => setEditDate(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Método de pago *</label>
+              <select
+                value={editMethod}
+                onChange={(e) => setEditMethod(e.target.value as PaymentMethod)}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all bg-white"
+              >
+                {PAYMENT_METHODS.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Productos de la venta</label>
+            <div className="mb-2">
+              <ProductSelect
+                value={addProductId}
+                onChange={addEditRow}
+                products={products}
+              />
+            </div>
+            {editItems.length === 0 ? (
+              <p className="text-sm text-gray-400 py-3 text-center bg-gray-50 rounded-xl">
+                Sin productos. Agrega al menos uno con el buscador de arriba.
+              </p>
+            ) : (
+              <div className="space-y-2">
+                {editItems.map((it, i) => {
+                  const max = stockOf(it.productId, it.size)
+                  const unlimited = max === Number.MAX_SAFE_INTEGER
+                  return (
+                    <div key={`${it.productId}-${it.size ?? ''}-${i}`} className="flex items-center gap-2 p-3 bg-gray-50 rounded-xl">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-gray-900 truncate">{it.productName}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {it.size ? `Talla: ${it.size}` : 'Sin talla'}
+                          {!unlimited && ` · Disponible: ${max}`}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-400 uppercase mb-0.5">Cant.</label>
+                        <input
+                          type="number"
+                          min={1}
+                          max={unlimited ? undefined : max}
+                          value={it.quantity}
+                          onChange={(e) => updateEditItem(i, 'quantity', Number(e.target.value))}
+                          className="w-20 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent bg-white"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-400 uppercase mb-0.5">P. Unit.</label>
+                        <input
+                          type="number"
+                          min={0}
+                          step="0.01"
+                          value={it.unitPrice}
+                          onChange={(e) => updateEditItem(i, 'unitPrice', Number(e.target.value))}
+                          className="w-24 border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent bg-white"
+                        />
+                      </div>
+                      <span className="w-24 text-right text-sm font-semibold text-gray-900 shrink-0">
+                        {fmt(Math.round(it.quantity * it.unitPrice * 100) / 100)}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeEditItem(i)}
+                        title="Quitar producto"
+                        className="p-2 rounded-lg hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-3 border-t border-gray-100 text-sm">
+            <span className="text-gray-500">
+              Subtotal {fmt(editSubtotal)} · IVA (19%) {fmt(editTax)}
+            </span>
+            <span className="font-bold text-gray-900 text-base">Total {fmt(editSubtotal + editTax)}</span>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setIsEditOpen(false)}
+              className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={saving || editItems.length === 0}
+              className="px-5 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-violet-600 to-indigo-600 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 disabled:opacity-60 disabled:cursor-not-allowed disabled:shadow-none"
+            >
+              {saving ? 'Guardando...' : 'Guardar cambios'}
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       <Modal
         isOpen={!!previewProduct}

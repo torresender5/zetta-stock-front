@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Plus, Minus, Trash2, Info, CheckCircle, Clock, ShoppingBag, Search, Calendar, XCircle, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Plus, Minus, Trash2, Info, CheckCircle, Clock, ShoppingBag, Search, Calendar, XCircle, AlertTriangle, RefreshCw, Pencil } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useProductStore } from '../stores/productStore'
 import { usePurchaseStore } from '../stores/purchaseStore'
@@ -48,6 +48,8 @@ export default function Purchases() {
     fetchPurchases,
     addPurchase,
     updatePurchasePaymentStatus,
+    updatePurchase,
+    deletePurchase,
     setPage,
     setLimit,
     setSearch,
@@ -70,6 +72,10 @@ export default function Purchases() {
   const [pendingQty, setPendingQty] = useState(1)
   const [pendingUnitPrice, setPendingUnitPrice] = useState('')
   const [searchInput, setSearchInput] = useState(search)
+  const [editing, setEditing] = useState<Purchase | null>(null)
+  const [editSupplierId, setEditSupplierId] = useState('')
+  const [editDate, setEditDate] = useState('')
+  const [editPaymentStatus, setEditPaymentStatus] = useState<'paid' | 'pending'>('paid')
 
   const vesOf = (usd: number) => (rate && rate > 0 ? formatVes(usd * rate) : null)
 
@@ -170,6 +176,38 @@ export default function Purchases() {
 
   const hasSizes = (pendingProduct?.sizes?.length ?? 0) > 0
   const sizeMissing = hasSizes && !pendingSize
+
+  const openEdit = (p: Purchase) => {
+    setEditing(p)
+    setEditSupplierId(String(p.supplierId ?? ''))
+    setEditDate(p.date.slice(0, 10))
+    setEditPaymentStatus(p.paymentStatus)
+  }
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editing) return
+    try {
+      await updatePurchase(editing.id, {
+        supplierId: editSupplierId,
+        date: editDate,
+        paymentStatus: editPaymentStatus,
+      })
+      setEditing(null)
+    } catch {
+      // error se maneja en el store
+    }
+  }
+
+  const handleDelete = async (p: Purchase) => {
+    const label = p.purchaseNumber ? `la compra ${p.purchaseNumber}` : 'esta compra'
+    if (!window.confirm(`¿Eliminar ${label}? Se revertirá el stock de sus productos.`)) return
+    try {
+      await deletePurchase(p.id)
+    } catch {
+      // error se maneja en el store
+    }
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -282,6 +320,16 @@ export default function Purchases() {
                   label: 'Detalles',
                   icon: <Info className="w-4 h-4" />,
                   onClick: () => navigate(`/purchases/${p.id}`),
+                },
+                {
+                  label: 'Editar',
+                  icon: <Pencil className="w-4 h-4 text-violet-600" />,
+                  onClick: () => openEdit(p),
+                },
+                {
+                  label: 'Eliminar',
+                  icon: <Trash2 className="w-4 h-4 text-red-600" />,
+                  onClick: () => handleDelete(p),
                 },
                 ...(p.paymentStatus === 'pending'
                   ? [
@@ -471,6 +519,67 @@ export default function Purchases() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      <Modal isOpen={!!editing} onClose={() => setEditing(null)} title="Editar Compra" size="md">
+        {editing && (
+          <form onSubmit={handleEditSubmit} className="space-y-4">
+            <div className="rounded-xl bg-blue-50 border border-blue-100 px-4 py-2.5 text-sm text-blue-700">
+              {editing.purchaseNumber ? (
+                <>Editando la compra <span className="font-mono font-semibold">{editing.purchaseNumber}</span>. Los productos y montos no se modifican desde aquí.</>
+              ) : (
+                <>Solo se editan proveedor, fecha y estado de pago. Para eliminar la compra y revertir el stock, usa la opción Eliminar.</>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Proveedor *</label>
+              <SupplierSelect value={editSupplierId} onChange={setEditSupplierId} />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Fecha *</label>
+              <input
+                required
+                type="date"
+                value={editDate}
+                onChange={(e) => setEditDate(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Estado de Pago *</label>
+              <div className="flex gap-3">
+                <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-colors ${
+                  editPaymentStatus === 'paid' ? 'border-green-500 bg-green-50 text-green-700' : 'border-gray-200 hover:border-gray-300'
+                }`}>
+                  <input type="radio" name="editPaymentStatus" value="paid" checked={editPaymentStatus === 'paid'}
+                    onChange={() => setEditPaymentStatus('paid')} className="sr-only" />
+                  <span className="text-sm font-medium">Pagado</span>
+                </label>
+                <label className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border-2 cursor-pointer transition-colors ${
+                  editPaymentStatus === 'pending' ? 'border-orange-500 bg-orange-50 text-orange-700' : 'border-gray-200 hover:border-gray-300'
+                }`}>
+                  <input type="radio" name="editPaymentStatus" value="pending" checked={editPaymentStatus === 'pending'}
+                    onChange={() => setEditPaymentStatus('pending')} className="sr-only" />
+                  <span className="text-sm font-medium">Por Pagar</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3">
+              <button type="button" onClick={() => setEditing(null)}
+                className="bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors text-sm font-medium px-4 py-2.5">
+                Cancelar
+              </button>
+              <button type="submit" disabled={!editSupplierId || !editDate}
+                className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white px-4 py-2.5 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 text-sm font-medium disabled:opacity-50">
+                Guardar cambios
+              </button>
+            </div>
+          </form>
+        )}
       </Modal>
 
       <Modal isOpen={!!pendingProduct} onClose={closeAddModal} title="Agregar producto" size="md">

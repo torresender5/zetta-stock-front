@@ -4,7 +4,8 @@ import { Search, X, ChevronDown, Plus, Loader2 } from 'lucide-react'
 import { useProductStore } from '../stores/productStore'
 import { useRateStore } from '../stores/rateStore'
 import { productService, type CreateProductDto } from '../services/productService'
-import { CATEGORIES, parseMoney, formatVes } from '../lib/utils'
+import { parseMoney, formatVes } from '../lib/utils'
+import { useCategoryStore } from '../stores/categoryStore'
 import Modal from './Modal'
 import ProductImageInput from './ProductImageInput'
 import MoneyInput from './MoneyInput'
@@ -33,7 +34,8 @@ const emptyForm = {
   code: '',
   type: '',
   sku: '',
-  category: CATEGORIES[0],
+  category: '',
+  categoryId: null as string | null,
   purchasePrice: '',
   salePrice: '',
   sizes: [] as ProductSize[],
@@ -58,7 +60,19 @@ export function ProductSelect({
   const anchorRef = useRef<HTMLDivElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const rate = useRateStore((s) => s.rate)
+  const categories = useCategoryStore((s) => s.categories)
+  const fetchCategories = useCategoryStore((s) => s.fetchCategories)
   const vesOf = (usd: number) => (rate && rate > 0 ? formatVes(usd * rate) : null)
+
+  useEffect(() => {
+    if (useCategoryStore.getState().categories.length === 0) fetchCategories()
+  }, [fetchCategories])
+
+  useEffect(() => {
+    if (categories.length > 0 && !form.category) {
+      setForm((f) => (f.category ? f : { ...f, category: categories[0].name, categoryId: categories[0].id }))
+    }
+  }, [categories])
 
   const catalog = useMemo(
     () => (includeOutOfStock ? products : products.filter((p) => p.stock > 0)),
@@ -156,6 +170,7 @@ export function ProductSelect({
       type: form.type.trim(),
       sku: form.sku.trim(),
       category: form.category,
+      categoryId: form.categoryId,
       purchasePrice: parseMoney(form.purchasePrice),
       salePrice: parseMoney(form.salePrice),
       stock: sizes.length ? sizes.reduce((sum, s) => sum + s.stock, 0) : 0,
@@ -357,13 +372,19 @@ export function ProductSelect({
                 className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all focus:outline-none" />
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Categoría</label>
-            <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })}
-              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all focus:outline-none bg-white">
-              {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-          </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">Categoría</label>
+              <select required value={form.category}
+                onChange={(e) => {
+                  const name = e.target.value
+                  const cat = categories.find((c) => c.name === name)
+                  setForm({ ...form, category: name, categoryId: cat ? cat.id : null })
+                }}
+                className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all focus:outline-none bg-white">
+                {categories.length === 0 && <option value="">Cargando categorías...</option>}
+                {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
+              </select>
+            </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1.5">Imagen</label>
             <ProductImageInput value={null} onChange={setImageFile} />

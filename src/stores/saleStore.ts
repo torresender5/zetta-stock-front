@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import type { Sale, SaleItem, Invoice, PaginationMeta, PaymentMethod } from '../types'
-import { saleService, invoiceService } from '../services/saleService'
+import { saleService, invoiceService, type UpdateSaleDto } from '../services/saleService'
 import { useProductStore } from './productStore'
 
 const emptyMeta: PaginationMeta = { total: 0, page: 1, limit: 10, totalPages: 1 }
@@ -56,6 +56,7 @@ interface SaleStore {
     refundMethod?: string,
     paymentMethod?: PaymentMethod,
   ) => Promise<void>
+  updateSale: (id: string, body: UpdateSaleDto) => Promise<{ ok: boolean; error?: string }>
   updateInvoiceStatus: (id: string, status: 'paid' | 'pending') => Promise<void>
 }
 
@@ -211,6 +212,39 @@ export const useSaleStore = create<SaleStore>()((set, get) => ({
     } catch {
       set({ error: 'Error al actualizar estado de pago', loading: false })
       throw new Error('Error al actualizar estado de pago')
+    }
+  },
+
+  updateSale: async (saleId, body) => {
+    set({ loading: true, error: null })
+    try {
+      const updated = await saleService.update(saleId, body)
+      const prev = get().sale
+      const merged: Sale = {
+        ...toSale(updated),
+        // El PUT no incluye la factura: conservamos la existente (número y
+        // estado no cambian; montos se recalculan en el servidor)
+        invoice: prev?.id === saleId ? (prev.invoice ?? null) : null,
+      }
+      set((state) => ({
+        sale: state.sale?.id === saleId ? merged : state.sale,
+        sales: state.sales.map((s) =>
+          s.id === saleId ? { ...merged, invoice: s.invoice ?? merged.invoice ?? null } : s
+        ),
+        salesList: state.salesList.map((s) =>
+          s.id === saleId ? { ...merged, invoice: s.invoice ?? merged.invoice ?? null } : s
+        ),
+        loading: false,
+      }))
+      // El cambio de ítems puede reversar/aplicar stock: refrescamos el catálogo
+      await useProductStore.getState().fetchAllProducts()
+      return { ok: true }
+    } catch (err) {
+      const e = err as { response?: { data?: { message?: string | string[] } } }
+      const m = e?.response?.data?.message
+      const error = Array.isArray(m) ? m.join(', ') : typeof m === 'string' && m ? m : 'Error al actualizar venta'
+      set({ error, loading: false })
+      return { ok: false, error }
     }
   },
 

@@ -26,6 +26,23 @@ export interface UpdateSaleStatusDto {
   paymentMethod?: PaymentMethod
 }
 
+export interface UpdateSaleItemDto {
+  productId: string
+  productName: string
+  size?: string
+  quantity: number
+  unitPrice: number
+  subtotal: number
+}
+
+export interface UpdateSaleDto {
+  notes?: string
+  clientId?: string
+  date?: string
+  paymentMethod?: PaymentMethod
+  items?: UpdateSaleItemDto[]
+}
+
 export interface SaleWithInvoice {
   sale: Sale
   invoice: Invoice
@@ -63,6 +80,11 @@ export const saleService = {
 
   updatePaymentStatus: async (id: string, body: UpdateSaleStatusDto): Promise<Sale> => {
     const { data } = await api.patch<Sale>(`/sales/${id}`, body)
+    return data
+  },
+
+  update: async (id: string, body: UpdateSaleDto): Promise<Sale> => {
+    const { data } = await api.put<Sale>(`/sales/${id}`, body)
     return data
   },
 }
