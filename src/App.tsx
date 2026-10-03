@@ -15,6 +15,7 @@ import Purchases from './pages/Purchases'
 import PurchaseDetails from './pages/PurchaseDetails'
 import Sales from './pages/Sales'
 import SaleDetails from './pages/SaleDetails'
+import CartPage from './pages/CartPage'
 import Apartados from './pages/Apartados'
 import ApartadoDetails from './pages/ApartadoDetails'
 import Invoices from './pages/Invoices'
@@ -80,6 +81,7 @@ export default function App() {
         <Route path="/purchases/:id" element={<RequireRole view="purchases"><PurchaseDetails /></RequireRole>} />
         <Route path="/sales" element={<RequireRole view="sales"><Sales /></RequireRole>} />
         <Route path="/sales/:id" element={<RequireRole view="sales"><SaleDetails /></RequireRole>} />
+        <Route path="/cart" element={<RequireRole view="sales"><CartPage /></RequireRole>} />
         <Route path="/apartados" element={<RequireRole view="apartados"><Apartados /></RequireRole>} />
         <Route path="/apartados/:id" element={<RequireRole view="apartados"><ApartadoDetails /></RequireRole>} />
         <Route path="/invoices" element={<RequireRole view="invoices"><Invoices /></RequireRole>} />

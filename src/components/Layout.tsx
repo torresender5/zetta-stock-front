@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import BottomNav from './BottomNav'
+import CartFab from './CartFab'
 import SubscriptionBanner from './SubscriptionBanner'
 import ExpiredLock from './ExpiredLock'
 import { useAuthStore } from '../stores/authStore'
@@ -43,6 +44,7 @@ export default function Layout() {
         </main>
       </div>
       <BottomNav onOpenMenu={() => setSidebarOpen(true)} />
+      <CartFab />
     </div>
   )
 }

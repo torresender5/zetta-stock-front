@@ -13,7 +13,7 @@ import { useCajaStore } from '../stores/cajaStore'
 import { useAuthStore } from '../stores/authStore'
 import { canReadModule } from '../lib/permissions'
 import type { ModuleKey } from '../lib/permissions'
-import { formatDate } from '../lib/utils'
+import { formatDate, todayLocal } from '../lib/utils'
 import CurrencyToggle, { useDisplayCurrency, type DisplayCurrency } from '../components/CurrencyToggle'
 import type { Sale } from '../types'
 
@@ -109,6 +109,36 @@ export default function Dashboard() {
   const { sales, invoices, fetchSales, fetchInvoices } = useSaleStore()
   const { active: activeCaja, summary: cajaSummary, fetchActive: fetchActiveCaja } = useCajaStore()
   const [period, setPeriod] = useState<Period>('day')
+  const [startDate, setStartDate] = useState<string>('')
+  const [endDate, setEndDate] = useState<string>('')
+
+  const applyRange = (start: string, end: string) => {
+    setStartDate(start)
+    setEndDate(end)
+  }
+
+  const clearRange = () => {
+    setStartDate('')
+    setEndDate('')
+  }
+
+  const today = todayLocal()
+  const startOfWeek = useMemo(() => {
+    const date = new Date()
+    const day = (date.getDay() + 6) % 7
+    date.setDate(date.getDate() - day)
+    return date.toISOString().slice(0, 10)
+  }, [])
+  const monthStart = useMemo(() => {
+    const date = new Date()
+    date.setDate(1)
+    return date.toISOString().slice(0, 10)
+  }, [])
+  const last30Days = useMemo(() => {
+    const date = new Date()
+    date.setDate(date.getDate() - 29)
+    return date.toISOString().slice(0, 10)
+  }, [])
 
   useEffect(() => {
     if (canReadModule(role, 'products')) fetchAllProducts()
@@ -128,7 +158,17 @@ export default function Dashboard() {
   const hasSales = canReadModule(role, 'sales')
   const hasPurchases = canReadModule(role, 'purchases')
 
-  const chartData = useMemo(() => groupSalesByPeriod(activeSales, period), [activeSales, period])
+  const filteredSales = useMemo(() => {
+    if (!startDate && !endDate) return activeSales
+    return activeSales.filter((s) => {
+      const date = s.date.slice(0, 10)
+      if (startDate && date < startDate) return false
+      if (endDate && date > endDate) return false
+      return true
+    })
+  }, [activeSales, startDate, endDate])
+
+  const chartData = useMemo(() => groupSalesByPeriod(filteredSales, period), [filteredSales, period])
 
   const accountsPayable = useMemo(() => {
     const pending = purchases.filter((p) => (p.paymentStatus ?? 'paid') === 'pending')
@@ -156,7 +196,7 @@ export default function Dashboard() {
 
   const topProducts = useMemo(() => {
     const map: Record<string, { name: string; quantity: number; revenue: number }> = {}
-    for (const sale of sales) {
+    for (const sale of filteredSales) {
       for (const item of sale.items) {
         if (!map[item.productId]) {
           map[item.productId] = { name: item.productName, quantity: 0, revenue: 0 }
@@ -168,11 +208,11 @@ export default function Dashboard() {
     return Object.values(map)
       .sort((a, b) => b.quantity - a.quantity)
       .slice(0, 8)
-  }, [sales])
+  }, [filteredSales])
 
   const topClients = useMemo(() => {
     const map: Record<string, { name: string; purchases: number; totalSpent: number; itemCount: number }> = {}
-    for (const sale of sales) {
+    for (const sale of filteredSales) {
       if (!map[sale.clientId]) {
         map[sale.clientId] = { name: sale.clientName, purchases: 0, totalSpent: 0, itemCount: 0 }
       }
@@ -183,7 +223,7 @@ export default function Dashboard() {
     return Object.values(map)
       .sort((a, b) => b.totalSpent - a.totalSpent)
       .slice(0, 8)
-  }, [sales])
+  }, [filteredSales])
 
   const kpiValues: Record<string, string | number> = {
     products: products.length,
@@ -259,28 +299,91 @@ export default function Dashboard() {
       {/* Charts */}
       {hasSales && (
       <div className="bg-card rounded-2xl p-6 shadow-sm border border-border">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Gráficas de Ventas</h2>
-            <p className="text-sm text-muted-foreground mt-0.5">Análisis de ventas por período</p>
+        <div className="flex flex-col gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Gráficas de Ventas</h2>
+              <p className="text-sm text-muted-foreground mt-0.5">Análisis de ventas por período</p>
+            </div>
+            <div className="flex gap-1 bg-gray-100 rounded-xl p-1" role="tablist" aria-label="Período de ventas">
+              {(['day', 'week', 'month'] as Period[]).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  role="tab"
+                  aria-selected={period === p}
+                  onClick={() => setPeriod(p)}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-150 cursor-pointer ${
+                    period === p
+                      ? 'bg-card text-primary shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                >
+                  {periodLabels[p]}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex gap-1 bg-gray-100 rounded-xl p-1" role="tablist" aria-label="Período de ventas">
-            {(['day', 'week', 'month'] as Period[]).map((p) => (
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="flex flex-wrap gap-2">
               <button
-                key={p}
                 type="button"
-                role="tab"
-                aria-selected={period === p}
-                onClick={() => setPeriod(p)}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors duration-150 cursor-pointer ${
-                  period === p
-                    ? 'bg-card text-primary shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground'
-                }`}
+                onClick={() => applyRange(today, today)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border hover:bg-background transition-colors cursor-pointer"
               >
-                {periodLabels[p]}
+                Hoy
               </button>
-            ))}
+              <button
+                type="button"
+                onClick={() => applyRange(startOfWeek, today)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border hover:bg-background transition-colors cursor-pointer"
+              >
+                Esta semana
+              </button>
+              <button
+                type="button"
+                onClick={() => applyRange(monthStart, today)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border hover:bg-background transition-colors cursor-pointer"
+              >
+                Este mes
+              </button>
+              <button
+                type="button"
+                onClick={() => applyRange(last30Days, today)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-border hover:bg-background transition-colors cursor-pointer"
+              >
+                Últimos 30 días
+              </button>
+            </div>
+            <div className="flex items-end gap-2 ml-auto">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">Desde</span>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+              </label>
+              <label className="flex flex-col gap-1">
+                <span className="text-xs text-muted-foreground">Hasta</span>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="px-3 py-1.5 text-sm rounded-lg border border-border bg-card focus:outline-none focus:ring-2 focus:ring-primary/20"
+                />
+              </label>
+              {(startDate || endDate) && (
+                <button
+                  type="button"
+                  onClick={clearRange}
+                  className="px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                >
+                  Limpiar
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
