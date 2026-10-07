@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Search, Calendar, XCircle, Eye, CheckCircle, HandCoins } from 'lucide-react'
 import { usePurchaseStore } from '../stores/purchaseStore'
 import { purchaseService } from '../services/purchaseService'
+import { reportService } from '../services/reportService'
 import { formatDateOnly } from '../lib/utils'
 import CurrencyToggle, { useDisplayCurrency } from '../components/CurrencyToggle'
 import DataTable from '../components/DataTable'
@@ -124,25 +125,14 @@ export default function AccountsPayable() {
     }
   }
 
+  // Total del servidor: una sola petición (antes paginaba todo el listado).
   const loadTotal = async () => {
-    let total = 0
-    let currentPage = 1
-    let totalPages = 1
-    do {
-      try {
-        const { data, meta: resultMeta } = await purchaseService.getAll({
-          page: currentPage,
-          limit: 100,
-          paymentStatus: 'pending',
-        })
-        total += data.reduce((sum, p) => sum + p.total, 0)
-        totalPages = resultMeta.totalPages
-        currentPage += 1
-      } catch {
-        return
-      }
-    } while (currentPage <= totalPages)
-    setPendingTotal(total)
+    try {
+      const report = await reportService.getPayables({})
+      setPendingTotal(report.total)
+    } catch {
+      setPendingTotal(0)
+    }
   }
 
   const markAsPaid = async (id: string) => {

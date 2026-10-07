@@ -100,16 +100,6 @@ export default function UserManagement() {
     }
   }
 
-  if (!isAdmin) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 text-gray-500">
-        <Shield className="w-16 h-16 mb-4 text-gray-300" />
-        <h2 className="text-xl font-semibold mb-2">Acceso restringido</h2>
-        <p>Solo los administradores pueden gestionar usuarios.</p>
-      </div>
-    )
-  }
-
   return (
     <div>
       <div className="mb-6">

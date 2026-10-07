@@ -24,6 +24,7 @@ import AccountsReceivable from './pages/AccountsReceivable'
 import Reports from './pages/Reports'
 import UserManagement from './pages/UserManagement'
 import Profile from './pages/Profile'
+import Settings from './pages/Settings'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Plans from './pages/Plans'
@@ -91,6 +92,7 @@ export default function App() {
         <Route path="/users" element={<RequireRole view="users"><UserManagement /></RequireRole>} />
         <Route path="/suscripcion" element={<RequireRole view="suscripcion"><Subscription /></RequireRole>} />
         <Route path="/perfil" element={<Profile />} />
+        <Route path="/configuracion" element={<RequireRole view="settings"><Settings /></RequireRole>} />
       </Route>
     </Routes>
   )

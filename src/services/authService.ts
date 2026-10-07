@@ -13,6 +13,8 @@ export interface AuthUser {
   companyDocument?: string | null
   companyPhoneNumber?: string | null
   companyAddress?: string | null
+  companyCurrency?: string
+  companyTaxRate?: number
 }
 
 export interface CreateUserDto {
@@ -34,6 +36,25 @@ export interface UpdateCompanyDto {
   document?: string
   phoneNumber?: string
   address?: string
+  currency?: 'USD' | 'VES'
+  taxRate?: number
+  invoicePrefix?: string
+  salePrefix?: string
+}
+
+export interface CompanySettings {
+  id: number
+  name: string
+  kind: string
+  document: string | null
+  phoneNumber: string | null
+  address: string | null
+  description: string | null
+  currency: string
+  taxRate: number
+  invoicePrefix: string
+  salePrefix: string
+  logoUrl: string | null
 }
 
 export interface LoginResponse {
@@ -80,6 +101,8 @@ function userFromToken(token: string): AuthUser | null {
     companyDocument: payload.companyDocument != null ? String(payload.companyDocument) : null,
     companyPhoneNumber: payload.companyPhoneNumber != null ? String(payload.companyPhoneNumber) : null,
     companyAddress: payload.companyAddress != null ? String(payload.companyAddress) : null,
+    companyCurrency: payload.companyCurrency != null ? String(payload.companyCurrency) : 'USD',
+    companyTaxRate: payload.companyTaxRate != null ? Number(payload.companyTaxRate) : 19,
   }
 }
 
@@ -148,5 +171,24 @@ export const authService = {
     const { data } = await api.patch<LoginResponse>('/users/me/company', dto)
     const user = saveSession(data)
     return { user, token: data.access_token || data.token || '' }
+  },
+
+  getCompany: async (): Promise<CompanySettings> => {
+    const { data } = await api.get<CompanySettings>('/users/me/company')
+    return data
+  },
+
+  uploadCompanyLogo: async (file: File): Promise<{ logoUrl: string | null }> => {
+    const form = new FormData()
+    form.append('image', file)
+    const { data } = await api.patch<{ logoUrl: string | null }>('/users/me/company/logo', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    return data
+  },
+
+  removeCompanyLogo: async (): Promise<{ logoUrl: string | null }> => {
+    const { data } = await api.delete<{ logoUrl: string | null }>('/users/me/company/logo')
+    return data
   },
 }

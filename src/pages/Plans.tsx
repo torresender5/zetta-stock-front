@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Check, Crown, Loader2, Sparkles, Zap } from 'lucide-react'
 import { useSubscriptionStore } from '../stores/subscriptionStore'
-import { formatCop } from '../lib/utils'
+import { formatUsd } from '../lib/utils'
 import type { Plan } from '../types'
 
 type Billing = 'monthly' | 'yearly'
@@ -57,7 +57,7 @@ function PlanCard({
         ) : (
           <div className="flex items-baseline gap-1">
             <span className="text-4xl font-extrabold text-foreground">
-              {formatCop(price)}
+              {formatUsd(price)}
             </span>
             <span className="text-muted-foreground text-sm">
               /{billing === 'yearly' ? 'año' : 'mes'}

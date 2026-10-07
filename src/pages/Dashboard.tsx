@@ -8,14 +8,22 @@ import {
 import { useProductStore } from '../stores/productStore'
 import { useClientStore } from '../stores/clientStore'
 import { usePurchaseStore } from '../stores/purchaseStore'
-import { useSaleStore } from '../stores/saleStore'
 import { useCajaStore } from '../stores/cajaStore'
 import { useAuthStore } from '../stores/authStore'
+import { dashboardService } from '../services/dashboardService'
+import { invoiceService } from '../services/saleService'
+import { reportService } from '../services/reportService'
 import { canReadModule } from '../lib/permissions'
 import type { ModuleKey } from '../lib/permissions'
 import { formatDate, todayLocal } from '../lib/utils'
 import CurrencyToggle, { useDisplayCurrency, type DisplayCurrency } from '../components/CurrencyToggle'
-import type { Sale } from '../types'
+import type {
+  DashboardSummaryReport,
+  InvoiceStats,
+  PayablesReport,
+  ReceivablesReport,
+  SalesByPeriodRow,
+} from '../types'
 
 type Period = 'day' | 'week' | 'month'
 
@@ -26,43 +34,47 @@ function getWeekLabel(date: Date): string {
   return `Sem ${weekNum} - ${date.getFullYear()}`
 }
 
-function groupSalesByPeriod(sales: Sale[], period: Period) {
-  const grouped: Record<string, { label: string; count: number; amount: number; sortKey: string }> = {}
+/** 'YYYY-MM-DD' → Date local (evita el desfase de zona horaria de new Date). */
+function parseDateOnly(value: string): Date {
+  const [y, m, d] = value.split('-').map(Number)
+  return new Date(y, (m ?? 1) - 1, d ?? 1)
+}
 
-  for (const sale of sales) {
-    const date = new Date(sale.date)
+/**
+ * Agrega la serie diaria del resumen del servidor por día, semana o mes.
+ * El servidor ya devuelve las filas ordenadas por fecha, así que basta
+ * acumular en orden de inserción del Map.
+ */
+function groupRowsByPeriod(rows: SalesByPeriodRow[], period: Period) {
+  const grouped = new Map<string, { label: string; count: number; amount: number }>()
+
+  for (const row of rows) {
+    const date = parseDateOnly(row.date)
     let key: string
     let label: string
-    let sortKey: string
 
     switch (period) {
       case 'day':
-        key = sale.date
+        key = row.date
         label = date.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })
-        sortKey = sale.date
         break
       case 'week':
         key = getWeekLabel(date)
         label = key
-        sortKey = `${date.getFullYear()}-${String(Math.ceil(((date.getTime() - new Date(date.getFullYear(), 0, 1).getTime()) / 86400000 + new Date(date.getFullYear(), 0, 1).getDay() + 1) / 7)).padStart(2, '0')}`
         break
       case 'month':
         key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
         label = date.toLocaleDateString('es-CO', { month: 'short', year: 'numeric' })
-        sortKey = key
         break
     }
 
-    if (!grouped[key]) {
-      grouped[key] = { label, count: 0, amount: 0, sortKey }
-    }
-    grouped[key].count += 1
-    grouped[key].amount += sale.total
+    const current = grouped.get(key) ?? { label, count: 0, amount: 0 }
+    current.count += row.count
+    current.amount += row.total
+    grouped.set(key, current)
   }
 
-  return Object.values(grouped)
-    .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
-    .map(({ label, count, amount }) => ({ label, count, amount }))
+  return [...grouped.values()]
 }
 
 const periodLabels: Record<Period, string> = {
@@ -106,11 +118,16 @@ export default function Dashboard() {
   const { products, fetchAllProducts } = useProductStore()
   const { allClients, fetchClients } = useClientStore()
   const { purchases, fetchPurchases } = usePurchaseStore()
-  const { sales, invoices, fetchSales, fetchInvoices } = useSaleStore()
   const { active: activeCaja, summary: cajaSummary, fetchActive: fetchActiveCaja } = useCajaStore()
   const [period, setPeriod] = useState<Period>('day')
   const [startDate, setStartDate] = useState<string>('')
   const [endDate, setEndDate] = useState<string>('')
+
+  // Datos agregados: el servidor calcula todo en una consulta por fuente.
+  const [summary, setSummary] = useState<DashboardSummaryReport | null>(null)
+  const [invoiceStats, setInvoiceStats] = useState<InvoiceStats | null>(null)
+  const [receivables, setReceivables] = useState<ReceivablesReport | null>(null)
+  const [payables, setPayables] = useState<PayablesReport | null>(null)
 
   const applyRange = (start: string, end: string) => {
     setStartDate(start)
@@ -144,86 +161,82 @@ export default function Dashboard() {
     if (canReadModule(role, 'products')) fetchAllProducts()
     if (canReadModule(role, 'clients')) fetchClients()
     if (canReadModule(role, 'purchases')) fetchPurchases()
-    if (canReadModule(role, 'sales')) fetchSales()
-    if (canReadModule(role, 'invoices')) fetchInvoices()
     if (canReadModule(role, 'sales')) fetchActiveCaja()
+    if (canReadModule(role, 'invoices')) {
+      invoiceService
+        .getStats()
+        .then(setInvoiceStats)
+        .catch(() => setInvoiceStats(null))
+    }
+    if (canReadModule(role, 'purchases')) {
+      reportService
+        .getPayables({})
+        .then(setPayables)
+        .catch(() => setPayables(null))
+    }
+    if (canReadModule(role, 'sales')) {
+      reportService
+        .getReceivables({})
+        .then(setReceivables)
+        .catch(() => setReceivables(null))
+    }
   }, [role])
 
-  const activeSales = sales.filter((s) => s.paymentStatus !== 'cancelled')
+  // Resumen de ventas + tops (una sola petición) según el rango elegido
+  useEffect(() => {
+    if (!canReadModule(role, 'sales')) return
+    let cancelled = false
+    dashboardService
+      .getSummary({
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        excludeCancelled: true,
+      })
+      .then((data) => {
+        if (!cancelled) setSummary(data)
+      })
+      .catch(() => {
+        if (!cancelled) setSummary(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [role, startDate, endDate])
+
   const totalPurchases = purchases.reduce((sum, p) => sum + p.total, 0)
-  const totalSales = activeSales.reduce((sum, s) => sum + s.total, 0)
-  const pendingInvoices = invoices.filter((i) => i.status === 'pending').length
+  const totalSales = summary?.sales.totalSales ?? 0
+  const pendingInvoices = invoiceStats?.pending ?? 0
   const lowStock = products.filter((p) => p.stock < 10).length
 
   const hasSales = canReadModule(role, 'sales')
   const hasPurchases = canReadModule(role, 'purchases')
 
-  const filteredSales = useMemo(() => {
-    if (!startDate && !endDate) return activeSales
-    return activeSales.filter((s) => {
-      const date = s.date.slice(0, 10)
-      if (startDate && date < startDate) return false
-      if (endDate && date > endDate) return false
-      return true
-    })
-  }, [activeSales, startDate, endDate])
+  const chartData = useMemo(
+    () => groupRowsByPeriod(summary?.sales.byPeriod ?? [], period),
+    [summary, period],
+  )
 
-  const chartData = useMemo(() => groupSalesByPeriod(filteredSales, period), [filteredSales, period])
+  const accountsPayable = useMemo(
+    () =>
+      [...(payables?.rows ?? [])]
+        .map((row) => ({ supplier: row.name, total: row.total }))
+        .sort((a, b) => b.total - a.total),
+    [payables],
+  )
 
-  const accountsPayable = useMemo(() => {
-    const pending = purchases.filter((p) => (p.paymentStatus ?? 'paid') === 'pending')
-    const map: Record<string, { supplier: string; total: number }> = {}
-    for (const p of pending) {
-      const supplierName = p.supplier?.name ?? 'Sin proveedor'
-      if (!map[supplierName]) map[supplierName] = { supplier: supplierName, total: 0 }
-      map[supplierName].total += p.total
-    }
-    return Object.values(map).sort((a, b) => b.total - a.total)
-  }, [purchases])
+  const accountsReceivable = useMemo(
+    () =>
+      [...(receivables?.rows ?? [])]
+        .map((row) => ({ clientName: row.name, total: row.total }))
+        .sort((a, b) => b.total - a.total),
+    [receivables],
+  )
 
-  const accountsReceivable = useMemo(() => {
-    const pending = sales.filter((s) => (s.paymentStatus ?? 'paid') === 'pending')
-    const map: Record<string, { clientName: string; total: number }> = {}
-    for (const s of pending) {
-      if (!map[s.clientId]) map[s.clientId] = { clientName: s.clientName, total: 0 }
-      map[s.clientId].total += s.total
-    }
-    return Object.values(map).sort((a, b) => b.total - a.total)
-  }, [sales])
+  const totalPayable = payables?.total ?? 0
+  const totalReceivable = receivables?.total ?? 0
 
-  const totalPayable = accountsPayable.reduce((sum, a) => sum + a.total, 0)
-  const totalReceivable = accountsReceivable.reduce((sum, a) => sum + a.total, 0)
-
-  const topProducts = useMemo(() => {
-    const map: Record<string, { name: string; quantity: number; revenue: number }> = {}
-    for (const sale of filteredSales) {
-      for (const item of sale.items) {
-        if (!map[item.productId]) {
-          map[item.productId] = { name: item.productName, quantity: 0, revenue: 0 }
-        }
-        map[item.productId].quantity += item.quantity
-        map[item.productId].revenue += item.subtotal
-      }
-    }
-    return Object.values(map)
-      .sort((a, b) => b.quantity - a.quantity)
-      .slice(0, 8)
-  }, [filteredSales])
-
-  const topClients = useMemo(() => {
-    const map: Record<string, { name: string; purchases: number; totalSpent: number; itemCount: number }> = {}
-    for (const sale of filteredSales) {
-      if (!map[sale.clientId]) {
-        map[sale.clientId] = { name: sale.clientName, purchases: 0, totalSpent: 0, itemCount: 0 }
-      }
-      map[sale.clientId].purchases += 1
-      map[sale.clientId].totalSpent += sale.total
-      map[sale.clientId].itemCount += sale.items.reduce((sum, i) => sum + i.quantity, 0)
-    }
-    return Object.values(map)
-      .sort((a, b) => b.totalSpent - a.totalSpent)
-      .slice(0, 8)
-  }, [filteredSales])
+  const topProducts = useMemo(() => (summary?.topProducts ?? []).slice(0, 8), [summary])
+  const topClients = useMemo(() => (summary?.topClients ?? []).slice(0, 8), [summary])
 
   const kpiValues: Record<string, string | number> = {
     products: products.length,

@@ -1,4 +1,5 @@
 import api from '../lib/api'
+import { downloadBlob } from '../lib/utils'
 import type {
   ReportFilters,
   ExportFormat,
@@ -31,17 +32,6 @@ function buildParams(filters: ReportFilters): Record<string, string> {
   if (filters.endDate) params.endDate = filters.endDate
   if (filters.status) params.status = filters.status
   return params
-}
-
-function downloadBlob(blob: Blob, filename: string): void {
-  const url = URL.createObjectURL(blob)
-  const link = document.createElement('a')
-  link.href = url
-  link.download = filename
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  URL.revokeObjectURL(url)
 }
 
 export const reportService = {

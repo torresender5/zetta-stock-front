@@ -9,7 +9,7 @@ import {
   Check,
 } from 'lucide-react'
 import { subscriptionService } from '../services/subscriptionService'
-import { formatCop } from '../lib/utils'
+import { formatUsd } from '../lib/utils'
 import type { PaymentOrder } from '../types'
 
 type AdminOrder = PaymentOrder & { companyId: number; companyName: string }
@@ -109,11 +109,16 @@ export default function AdminOrders() {
                     <td className="px-6 py-4 text-muted-foreground">
                       {order.concept}
                       <span className="block text-xs text-muted-foreground/70 uppercase">
-                        {order.period}
+                        {order.period} ·{' '}
+                        {order.provider === 'stripe'
+                          ? 'tarjeta'
+                          : order.provider === 'pabilo'
+                            ? 'pabilo'
+                            : 'manual'}
                       </span>
                     </td>
                     <td className="px-6 py-4 font-semibold text-foreground tabular-nums">
-                      {formatCop(order.amount)}
+                      {formatUsd(order.amount)}
                     </td>
                     <td className="px-6 py-4">
                       {order.status === 'pending' ? (

@@ -12,7 +12,7 @@ import {
 import Modal from '../components/Modal'
 import { subscriptionService } from '../services/subscriptionService'
 import { VIEW_LABELS } from '../lib/permissions'
-import { formatCop } from '../lib/utils'
+import { formatUsd } from '../lib/utils'
 import MoneyInput from '../components/MoneyInput'
 import type { Plan } from '../types'
 
@@ -239,13 +239,13 @@ export default function AdminPlans() {
                 <div className="flex justify-between">
                   <span className="text-xs font-semibold uppercase tracking-wide">Mensual</span>
                   <span className="font-semibold text-foreground tabular-nums">
-                    {formatCop(plan.priceMonthly)}
+                    {formatUsd(plan.priceMonthly)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-xs font-semibold uppercase tracking-wide">Anual</span>
                   <span className="font-semibold text-foreground tabular-nums">
-                    {formatCop(plan.priceYearly)}
+                    {formatUsd(plan.priceYearly)}
                   </span>
                 </div>
                 <div className="flex justify-between">

@@ -1,3 +1,5 @@
+import { useAuthStore } from '../stores/authStore'
+
 export function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 9)
 }
@@ -91,4 +93,23 @@ export function parseMoney(value: string): number {
   return Number.isFinite(n) && n > 0 ? n : 0
 }
 
-export const TAX_RATE = 0.19 // IVA 19%
+/**
+ * % de IVA en formato decimal (0-1) según la configuración de la empresa
+ * (Settings → % IVA). Fuera de sesión o sin configurar: 19%.
+ */
+export function getTaxRate(): number {
+  const rate = useAuthStore.getState().user?.companyTaxRate
+  return typeof rate === 'number' && rate >= 0 && rate <= 100 ? rate / 100 : 0.19
+}
+
+/** Descarga un Blob como archivo (PDF/XLSX) usando un enlace temporal. */
+export function downloadBlob(blob: Blob, filename: string): void {
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  URL.revokeObjectURL(url)
+}

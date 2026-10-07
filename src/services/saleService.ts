@@ -1,8 +1,11 @@
 import api from '../lib/api'
+import { downloadBlob } from '../lib/utils'
 import type {
   Sale,
   SaleItem,
   Invoice,
+  InvoiceQueryParams,
+  InvoiceStats,
   PaymentMethod,
   PaginatedResponse,
   SaleQueryParams,
@@ -49,20 +52,6 @@ export interface SaleWithInvoice {
 }
 
 export const saleService = {
-  getAll: async (): Promise<Sale[]> => {
-    const limit = 100
-    let page = 1
-    let totalPages = 1
-    const all: Sale[] = []
-    do {
-      const { data } = await api.get<PaginatedResponse<Sale>>('/sales', { params: { page, limit } })
-      all.push(...data.data)
-      totalPages = data.meta.totalPages
-      page += 1
-    } while (page <= totalPages)
-    return all
-  },
-
   getPage: async (params: SaleQueryParams): Promise<PaginatedResponse<Sale>> => {
     const { data } = await api.get<PaginatedResponse<Sale>>('/sales', { params })
     return data
@@ -90,9 +79,23 @@ export const saleService = {
 }
 
 export const invoiceService = {
-  getAll: async (): Promise<Invoice[]> => {
-    const { data } = await api.get<Invoice[]>('/invoices')
+  getPage: async (params: InvoiceQueryParams = {}): Promise<PaginatedResponse<Invoice>> => {
+    const { data } = await api.get<PaginatedResponse<Invoice>>('/invoices', { params })
     return data
+  },
+
+  /** Conteos por estado (respeta búsqueda y fechas, no el filtro de estado). */
+  getStats: async (params: Omit<InvoiceQueryParams, 'page' | 'limit' | 'status'> = {}): Promise<InvoiceStats> => {
+    const { data } = await api.get<InvoiceStats>('/invoices/stats', { params })
+    return data
+  },
+
+  exportPdf: async (id: string, invoiceNumber?: string): Promise<void> => {
+    const { data } = await api.get<Blob>(`/invoices/${id}/export`, {
+      params: { format: 'pdf' },
+      responseType: 'blob',
+    })
+    downloadBlob(data, `factura-${invoiceNumber ?? id}.pdf`)
   },
 
   updateStatus: async (id: string, status: 'paid' | 'pending'): Promise<Invoice> => {

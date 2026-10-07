@@ -17,6 +17,7 @@ import {
   UserCircle,
   Shield,
   Crown,
+  Settings,
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { useSubscriptionStore } from '../stores/subscriptionStore'
@@ -39,6 +40,7 @@ const links: { to: string; label: string; icon: typeof LayoutDashboard; view: Vi
   { to: '/suscripcion', label: 'Suscripción', icon: Crown, view: 'suscripcion' },
   { to: '/perfil', label: 'Mi Perfil', icon: UserCircle, view: 'profile' },
   { to: '/users', label: 'Usuarios', icon: Shield, view: 'users' },
+  { to: '/configuracion', label: 'Configuración', icon: Settings, view: 'settings' },
 ]
 
 interface SidebarProps {

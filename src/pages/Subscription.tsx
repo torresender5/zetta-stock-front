@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
   BadgeCheck,
@@ -6,10 +7,13 @@ import {
   Check,
   CheckCircle2,
   Clock,
+  CreditCard,
   Crown,
+  Landmark,
   Loader2,
   Lock,
   ShieldCheck,
+  Smartphone,
   Sparkles,
   Users,
   XCircle,
@@ -17,7 +21,8 @@ import {
 } from 'lucide-react'
 import Modal from '../components/Modal'
 import { useSubscriptionStore } from '../stores/subscriptionStore'
-import { formatCop } from '../lib/utils'
+import { useRateStore } from '../stores/rateStore'
+import { formatUsd, formatVes } from '../lib/utils'
 import {
   daysUntil,
   formatSubscriptionEnd,
@@ -27,12 +32,39 @@ import {
 import type { PaymentOrder, Plan } from '../types'
 
 type Billing = 'monthly' | 'yearly'
+type PaymentMethod = 'stripe' | 'pabilo' | 'manual'
 
 const PERIOD_LABELS: Record<string, string> = {
   trial: 'Prueba gratuita',
   monthly: 'Mensual',
   yearly: 'Anual',
 }
+
+const METHOD_OPTIONS: Array<{
+  key: PaymentMethod
+  label: string
+  hint: string
+  Icon: typeof CreditCard
+}> = [
+  {
+    key: 'stripe',
+    label: 'Tarjeta de crédito o débito',
+    hint: 'Cobro seguro en USD con Stripe',
+    Icon: CreditCard,
+  },
+  {
+    key: 'pabilo',
+    label: 'Pago móvil o transferencia',
+    hint: 'En USD; Pabilo lo convierte a bolívares al pagar',
+    Icon: Smartphone,
+  },
+  {
+    key: 'manual',
+    label: 'Transferencia manual',
+    hint: 'Orden pendiente de confirmación por soporte',
+    Icon: Landmark,
+  },
+]
 
 const ORDER_STATUS: Record<string, { label: string; className: string }> = {
   pending: {
@@ -60,20 +92,63 @@ export default function Subscription() {
     plans,
     loading,
     error,
+    paymentMethods,
     fetchMySubscription,
     fetchPlans,
+    fetchPaymentMethods,
     purchase,
   } = useSubscriptionStore()
+  const rate = useRateStore((s) => s.rate)
 
   const [checkout, setCheckout] = useState<Plan | null>(null)
   const [billing, setBilling] = useState<Billing>('monthly')
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('manual')
   const [createdOrder, setCreatedOrder] = useState<PaymentOrder | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
 
   useEffect(() => {
     fetchMySubscription()
     if (plans.length === 0) fetchPlans()
+    fetchPaymentMethods()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Retorno desde el checkout de Stripe/Pabilo (?payment=success|cancelled)
+  useEffect(() => {
+    const payment = searchParams.get('payment')
+    if (!payment) return
+    const orderId = Number(searchParams.get('orderId'))
+    setSearchParams({}, { replace: true })
+
+    if (payment === 'cancelled') {
+      setNotice('Pago cancelado. Puedes intentarlo de nuevo cuando quieras.')
+      return
+    }
+    if (payment !== 'success') return
+
+    setNotice('Pago enviado. Estamos esperando la confirmación del proveedor…')
+    let attempts = 0
+    const timer = setInterval(() => {
+      void (async () => {
+        attempts += 1
+        await fetchMySubscription()
+        const orders = useSubscriptionStore.getState().paymentOrders
+        const settled =
+          Number.isInteger(orderId) &&
+          orders.some((o) => o.id === orderId && o.status === 'paid')
+        if (settled || attempts >= 5) {
+          clearInterval(timer)
+          setNotice(
+            settled
+              ? '¡Pago confirmado! Tu plan ya está activo.'
+              : 'Recibimos tu pago; tu plan se activará en unos minutos.',
+          )
+        }
+      })()
+    }, 2500)
+    return () => clearInterval(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -81,21 +156,35 @@ export default function Subscription() {
   const daysLeft = daysUntil(subscription)
   const currentKey = subscription?.plan?.key
 
+  const onlineMethods = useMemo<PaymentMethod[]>(
+    () => [
+      ...(paymentMethods?.stripe ? (['stripe'] as PaymentMethod[]) : []),
+      ...(paymentMethods?.pabilo ? (['pabilo'] as PaymentMethod[]) : []),
+    ],
+    [paymentMethods],
+  )
+
   const handleSelect = (plan: Plan) => {
     setCreatedOrder(null)
     setNotice(null)
     setBilling('monthly')
+    setPaymentMethod(onlineMethods[0] ?? 'manual')
     if (isFree(plan)) {
-      void handlePurchase(plan, 'monthly')
+      void handlePurchase(plan, 'monthly', 'manual')
       return
     }
     setCheckout(plan)
   }
 
-  const handlePurchase = async (plan: Plan, period: Billing) => {
+  const handlePurchase = async (
+    plan: Plan,
+    period: Billing,
+    method: PaymentMethod,
+  ) => {
     setSubmitting(true)
     setNotice(null)
-    const result = await purchase(plan.id, period)
+    const provider = isFree(plan) ? undefined : method
+    const result = await purchase(plan.id, period, provider)
     setSubmitting(false)
     if (!result.ok) {
       setNotice(result.error ?? 'Error al generar la orden')
@@ -106,6 +195,10 @@ export default function Subscription() {
       setNotice(
         `Tu plan Gratis está activo. Tienes ${plan.trialDays ?? 30} días de prueba renovados.`,
       )
+      return
+    }
+    if (result.order?.checkoutUrl) {
+      window.location.href = result.order.checkoutUrl
       return
     }
     setCreatedOrder(result.order ?? null)
@@ -207,7 +300,7 @@ export default function Subscription() {
               {subscription?.price ? (
                 <div className="flex items-center gap-2 text-muted-foreground">
                   <Zap className="w-4 h-4 text-violet-500" />
-                  {formatCop(subscription.price)} /{' '}
+                  {formatUsd(subscription.price)} /{' '}
                   {PERIOD_LABELS[subscription.period] ?? subscription.period}
                 </div>
               ) : null}
@@ -276,12 +369,12 @@ export default function Subscription() {
                       <>
                         <div className="flex items-baseline gap-1">
                           <span className="text-3xl font-extrabold text-foreground">
-                            {formatCop(plan.priceMonthly)}
+                            {formatUsd(plan.priceMonthly)}
                           </span>
                           <span className="text-xs text-muted-foreground">/mes</span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {formatCop(plan.priceYearly)}/año · Hasta {plan.maxUsers}{' '}
+                          {formatUsd(plan.priceYearly)}/año · Hasta {plan.maxUsers}{' '}
                           usuario{plan.maxUsers === 1 ? '' : 's'}
                         </p>
                       </>
@@ -326,6 +419,7 @@ export default function Subscription() {
                 <tr className="text-left text-muted-foreground border-b border-border">
                   <th className="px-6 py-3 font-medium">Concepto</th>
                   <th className="px-6 py-3 font-medium">Valor</th>
+                  <th className="px-6 py-3 font-medium">Método</th>
                   <th className="px-6 py-3 font-medium">Estado</th>
                   <th className="px-6 py-3 font-medium">Fecha</th>
                 </tr>
@@ -339,7 +433,14 @@ export default function Subscription() {
                         {order.concept}
                       </td>
                       <td className="px-6 py-3.5 text-foreground font-semibold tabular-nums">
-                        {formatCop(order.amount)}
+                        {formatUsd(order.amount)}
+                      </td>
+                      <td className="px-6 py-3.5 text-muted-foreground">
+                        {order.provider === 'stripe'
+                          ? 'Tarjeta'
+                          : order.provider === 'pabilo'
+                            ? 'Pabilo'
+                            : 'Manual'}
                       </td>
                       <td className="px-6 py-3.5">
                         <span
@@ -387,7 +488,7 @@ export default function Subscription() {
                   Tu orden quedó pendiente de pago
                 </p>
                 <p className="text-sm text-emerald-700">
-                  {checkout.name} · {formatCop(createdOrder.amount)} ·{' '}
+                  {checkout.name} · {formatUsd(createdOrder.amount)} ·{' '}
                   {PERIOD_LABELS[createdOrder.period]}
                 </p>
               </div>
@@ -429,7 +530,7 @@ export default function Subscription() {
               >
                 <p className="text-sm font-semibold">Mensual</p>
                 <p className="text-lg font-extrabold text-foreground">
-                  {formatCop(checkout.priceMonthly)}
+                  {formatUsd(checkout.priceMonthly)}
                 </p>
               </button>
               <button
@@ -442,9 +543,51 @@ export default function Subscription() {
               >
                 <p className="text-sm font-semibold">Anual</p>
                 <p className="text-lg font-extrabold text-foreground">
-                  {formatCop(checkout.priceYearly)}
+                  {formatUsd(checkout.priceYearly)}
                 </p>
               </button>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground mb-2">
+                Método de pago
+              </p>
+              <div className="grid gap-2">
+                {METHOD_OPTIONS.filter(
+                  (m) => m.key === 'manual' || onlineMethods.includes(m.key),
+                ).map(({ key, label, hint, Icon }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setPaymentMethod(key)}
+                    className={`flex items-start gap-3 p-3 rounded-2xl border text-left transition-colors cursor-pointer ${
+                      paymentMethod === key
+                        ? 'border-violet-300 bg-violet-50 text-violet-700 ring-1 ring-violet-500/30'
+                        : 'border-border text-muted-foreground hover:bg-muted/60'
+                    }`}
+                  >
+                    <Icon className="w-5 h-5 mt-0.5 shrink-0" />
+                    <span>
+                      <span className="block text-sm font-semibold text-foreground">
+                        {label}
+                      </span>
+                      <span className="block text-xs text-muted-foreground">
+                        {hint}
+                      </span>
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {onlineMethods.length === 0 && (
+                <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-xl p-2.5 mt-2">
+                  Los pagos online no están habilitados; se generará una orden
+                  de transferencia manual.
+                </p>
+              )}
+              {paymentMethod === 'pabilo' && rate && (
+                <p className="text-xs text-muted-foreground mt-2 tabular-nums">
+                  ≈ {formatVes(checkoutPrice * rate)} a la tasa oficial del día
+                </p>
+              )}
             </div>
             {notice && (
               <p className="text-sm font-medium text-red-600 bg-red-50 border border-red-100 rounded-xl p-3">
@@ -453,19 +596,28 @@ export default function Subscription() {
             )}
             <button
               disabled={submitting}
-              onClick={() => void handlePurchase(checkout, billing)}
+              onClick={() => void handlePurchase(checkout, billing, paymentMethod)}
               className="w-full py-3 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
             >
               {submitting ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" /> Generando…
+                  <Loader2 className="w-4 h-4 animate-spin" />{' '}
+                  {paymentMethod === 'manual'
+                    ? 'Generando…'
+                    : 'Redirigiendo…'}
                 </>
+              ) : paymentMethod === 'stripe' ? (
+                <>Pagar con tarjeta · {formatUsd(checkoutPrice)}</>
+              ) : paymentMethod === 'pabilo' ? (
+                <>Pagar con Pabilo · {formatUsd(checkoutPrice)}</>
               ) : (
-                <>Generar orden · {formatCop(checkoutPrice)}</>
+                <>Generar orden · {formatUsd(checkoutPrice)}</>
               )}
             </button>
             <p className="text-center text-xs text-muted-foreground">
-              El plan se activará cuando se confirme el pago.
+              {paymentMethod === 'manual'
+                ? 'El plan se activará cuando se confirme el pago.'
+                : 'Serás redirigido al proveedor de pago. El plan se activa automáticamente al confirmarse.'}
             </p>
           </div>
         ) : null}

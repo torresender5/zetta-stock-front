@@ -1,9 +1,10 @@
 import { create } from 'zustand'
-import type { Sale, SaleItem, Invoice, PaginationMeta, PaymentMethod } from '../types'
+import type { Sale, SaleItem, Invoice, InvoiceStats, PaginationMeta, PaymentMethod } from '../types'
 import { saleService, invoiceService, type UpdateSaleDto } from '../services/saleService'
 import { useProductStore } from './productStore'
 
 const emptyMeta: PaginationMeta = { total: 0, page: 1, limit: 10, totalPages: 1 }
+const emptyStats: InvoiceStats = { paid: 0, pending: 0, cancelled: 0, total: 0 }
 
 const toSale = (s: Sale): Sale => ({
   ...s,
@@ -16,7 +17,6 @@ const toInvoice = (inv: Invoice): Invoice => ({
 })
 
 interface SaleStore {
-  sales: Sale[]
   salesList: Sale[]
   salesMeta: PaginationMeta
   page: number
@@ -26,10 +26,17 @@ interface SaleStore {
   startDateFilter: string
   endDateFilter: string
   invoices: Invoice[]
+  invoicesMeta: PaginationMeta
+  invoicePage: number
+  invoiceLimit: number
+  invoiceSearch: string
+  invoiceStatusFilter: '' | 'paid' | 'pending' | 'cancelled'
+  invoiceStartDate: string
+  invoiceEndDate: string
+  invoiceStats: InvoiceStats
   sale: Sale | null
   loading: boolean
   error: string | null
-  fetchSales: () => Promise<void>
   fetchSalesPage: () => Promise<void>
   fetchSaleById: (id: string) => Promise<void>
   setPage: (page: number) => void
@@ -39,6 +46,15 @@ interface SaleStore {
   setStartDateFilter: (date: string) => void
   setEndDateFilter: (date: string) => void
   fetchInvoices: () => Promise<void>
+  setInvoicePage: (page: number) => void
+  setInvoiceLimit: (limit: number) => void
+  /** Aplica filtros de facturas de una sola vez (una petición) y vuelve a página 1. */
+  setInvoiceFilters: (filters: {
+    search?: string
+    status?: '' | 'paid' | 'pending' | 'cancelled'
+    startDate?: string
+    endDate?: string
+  }) => void
   addSale: (
     clientId: string,
     date: string,
@@ -61,7 +77,6 @@ interface SaleStore {
 }
 
 export const useSaleStore = create<SaleStore>()((set, get) => ({
-  sales: [],
   salesList: [],
   salesMeta: emptyMeta,
   page: 1,
@@ -71,19 +86,17 @@ export const useSaleStore = create<SaleStore>()((set, get) => ({
   startDateFilter: '',
   endDateFilter: '',
   invoices: [],
+  invoicesMeta: emptyMeta,
+  invoicePage: 1,
+  invoiceLimit: 10,
+  invoiceSearch: '',
+  invoiceStatusFilter: '',
+  invoiceStartDate: '',
+  invoiceEndDate: '',
+  invoiceStats: emptyStats,
   sale: null,
   loading: false,
   error: null,
-
-  fetchSales: async () => {
-    set({ loading: true, error: null })
-    try {
-      const sales = await saleService.getAll()
-      set({ sales: sales.map(toSale), loading: false })
-    } catch {
-      set({ error: 'Error al cargar ventas', loading: false })
-    }
-  },
 
   fetchSalesPage: async () => {
     const { page, limit, search, paymentStatusFilter, startDateFilter, endDateFilter } = get()
@@ -148,20 +161,68 @@ export const useSaleStore = create<SaleStore>()((set, get) => ({
     get().fetchSalesPage()
   },
 
+  // Listado paginado server-side de facturas + conteos por estado en paralelo.
   fetchInvoices: async () => {
+    const {
+      invoicePage,
+      invoiceLimit,
+      invoiceSearch,
+      invoiceStatusFilter,
+      invoiceStartDate,
+      invoiceEndDate,
+    } = get()
     set({ loading: true, error: null })
     try {
-      const invoices = await invoiceService.getAll()
-      set({ invoices: invoices.map(toInvoice), loading: false })
+      const filters = {
+        search: invoiceSearch || undefined,
+        startDate: invoiceStartDate || undefined,
+        endDate: invoiceEndDate || undefined,
+      }
+      const [page, stats] = await Promise.all([
+        invoiceService.getPage({
+          ...filters,
+          page: invoicePage,
+          limit: invoiceLimit,
+          status: invoiceStatusFilter || undefined,
+        }),
+        invoiceService.getStats(filters),
+      ])
+      set({
+        invoices: page.data.map(toInvoice),
+        invoicesMeta: page.meta,
+        invoiceStats: stats,
+        loading: false,
+      })
     } catch {
       set({ error: 'Error al cargar facturas', loading: false })
     }
   },
 
+  setInvoicePage: (invoicePage) => {
+    set({ invoicePage })
+    get().fetchInvoices()
+  },
+
+  setInvoiceLimit: (invoiceLimit) => {
+    set({ invoiceLimit, invoicePage: 1 })
+    get().fetchInvoices()
+  },
+
+  setInvoiceFilters: (filters) => {
+    set((state) => ({
+      invoiceSearch: filters.search ?? state.invoiceSearch,
+      invoiceStatusFilter: filters.status ?? state.invoiceStatusFilter,
+      invoiceStartDate: filters.startDate ?? state.invoiceStartDate,
+      invoiceEndDate: filters.endDate ?? state.invoiceEndDate,
+      invoicePage: 1,
+    }))
+    get().fetchInvoices()
+  },
+
   addSale: async (clientId, date, items, paymentStatus, paymentMethod, receivedAmount, fxRate) => {
     set({ loading: true, error: null })
     try {
-      const { sale, invoice } = await saleService.create({
+      const { invoice } = await saleService.create({
         // Si no hay cliente seleccionado se omite: el API registra la venta
         // con el cliente genérico "Consumidor final"
         ...(clientId ? { clientId } : {}),
@@ -176,11 +237,7 @@ export const useSaleStore = create<SaleStore>()((set, get) => ({
       // solo refrescamos productos para reflejar el stock actualizado
       const { fetchAllProducts } = useProductStore.getState()
       await fetchAllProducts()
-      set((state) => ({
-        sales: [...state.sales, toSale(sale)],
-        invoices: [...state.invoices, toInvoice(invoice)],
-        loading: false,
-      }))
+      set({ loading: false })
       await get().fetchSalesPage()
       return invoice
     } catch {
@@ -200,7 +257,6 @@ export const useSaleStore = create<SaleStore>()((set, get) => ({
         paymentMethod,
       })
       set((state) => ({
-        sales: state.sales.map((s) => (s.id === saleId ? toSale(updated) : s)),
         salesList: state.salesList.map((s) => (s.id === saleId ? toSale(updated) : s)),
         invoices: state.invoices.map((inv) =>
           inv.saleId === saleId
@@ -228,9 +284,6 @@ export const useSaleStore = create<SaleStore>()((set, get) => ({
       }
       set((state) => ({
         sale: state.sale?.id === saleId ? merged : state.sale,
-        sales: state.sales.map((s) =>
-          s.id === saleId ? { ...merged, invoice: s.invoice ?? merged.invoice ?? null } : s
-        ),
         salesList: state.salesList.map((s) =>
           s.id === saleId ? { ...merged, invoice: s.invoice ?? merged.invoice ?? null } : s
         ),
@@ -252,10 +305,20 @@ export const useSaleStore = create<SaleStore>()((set, get) => ({
     set({ loading: true, error: null })
     try {
       const updated = await invoiceService.updateStatus(id, status)
-      set((state) => ({
+      set((state) => {
+        // Ajusta los conteos por estado sin refetch: se movió una factura.
+        const prev = state.invoices.find((inv) => inv.id === id)
+        const stats = { ...state.invoiceStats }
+        if (prev && prev.status !== status) {
+          stats[prev.status] = Math.max(0, stats[prev.status] - 1)
+          stats[status] = stats[status] + 1
+        }
+        return {
           invoices: state.invoices.map((inv) => (inv.id === id ? toInvoice(updated) : inv)),
-        loading: false,
-      }))
+          invoiceStats: stats,
+          loading: false,
+        }
+      })
     } catch {
       set({ error: 'Error al actualizar factura', loading: false })
       throw new Error('Error al actualizar factura')

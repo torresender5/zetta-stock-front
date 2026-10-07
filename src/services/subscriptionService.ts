@@ -1,5 +1,11 @@
 import api from '../lib/api'
-import type { MySubscriptionResponse, PaymentOrder, Plan, Subscription } from '../types'
+import type {
+  MySubscriptionResponse,
+  PaymentMethods,
+  PaymentOrder,
+  Plan,
+  Subscription,
+} from '../types'
 
 export interface PurchaseResult {
   subscription: Subscription | null
@@ -17,8 +23,21 @@ export const subscriptionService = {
     return data
   },
 
-  purchase: async (planId: number, period: 'monthly' | 'yearly'): Promise<PurchaseResult> => {
-    const { data } = await api.post<PurchaseResult>('/subscription/purchase', { planId, period })
+  purchase: async (
+    planId: number,
+    period: 'monthly' | 'yearly',
+    provider?: 'stripe' | 'pabilo' | 'manual',
+  ): Promise<PurchaseResult> => {
+    const { data } = await api.post<PurchaseResult>('/subscription/purchase', {
+      planId,
+      period,
+      ...(provider ? { provider } : {}),
+    })
+    return data
+  },
+
+  getPaymentMethods: async (): Promise<PaymentMethods> => {
+    const { data } = await api.get<PaymentMethods>('/subscription/payment-methods')
     return data
   },
 

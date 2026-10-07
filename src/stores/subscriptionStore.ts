@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { subscriptionService } from '../services/subscriptionService'
-import type { PaymentOrder, Plan, Subscription } from '../types'
+import type { PaymentMethods, PaymentOrder, Plan, Subscription } from '../types'
 
 interface SubscriptionStore {
   subscription: Subscription | null
@@ -13,12 +13,15 @@ interface SubscriptionStore {
   purchase: (
     planId: number,
     period: 'monthly' | 'yearly',
+    provider?: 'stripe' | 'pabilo' | 'manual',
   ) => Promise<{
     ok: boolean
     error?: string
     order?: PaymentOrder | null
     subscription?: Subscription | null
   }>
+  paymentMethods: PaymentMethods | null
+  fetchPaymentMethods: () => Promise<void>
 }
 
 export const useSubscriptionStore = create<SubscriptionStore>()((set, get) => ({
@@ -27,6 +30,7 @@ export const useSubscriptionStore = create<SubscriptionStore>()((set, get) => ({
   plans: [],
   loading: false,
   error: null,
+  paymentMethods: null,
 
   fetchMySubscription: async () => {
     set({ loading: true, error: null })
@@ -58,12 +62,15 @@ export const useSubscriptionStore = create<SubscriptionStore>()((set, get) => ({
     }
   },
 
-  purchase: async (planId, period) => {
+  purchase: async (planId, period, provider) => {
     set({ loading: true, error: null })
     try {
-      const result = await subscriptionService.purchase(planId, period)
+      const result = await subscriptionService.purchase(planId, period, provider)
       set({ loading: false })
-      await get().fetchMySubscription()
+      if (!result.order?.checkoutUrl) {
+        // Solo recarga la suscripción si no salimos al checkout del proveedor
+        await get().fetchMySubscription()
+      }
       return {
         ok: true,
         order: result.order,
@@ -76,6 +83,16 @@ export const useSubscriptionStore = create<SubscriptionStore>()((set, get) => ({
           : 'Error al seleccionar el plan'
       set({ error: message, loading: false })
       return { ok: false, error: message }
+    }
+  },
+
+  fetchPaymentMethods: async () => {
+    try {
+      const methods = await subscriptionService.getPaymentMethods()
+      set({ paymentMethods: methods })
+    } catch {
+      // sin métodos online disponibles: queda en null (solo transferencia)
+      set({ paymentMethods: null })
     }
   },
 }))

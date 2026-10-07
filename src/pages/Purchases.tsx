@@ -5,7 +5,7 @@ import { useProductStore } from '../stores/productStore'
 import { usePurchaseStore } from '../stores/purchaseStore'
 import { useSupplierStore } from '../stores/supplierStore'
 import { useRateStore } from '../stores/rateStore'
-import { formatVes, formatDateOnly, TAX_RATE, todayLocal, parseMoney } from '../lib/utils'
+import { formatVes, formatDateOnly, getTaxRate, todayLocal, parseMoney } from '../lib/utils'
 import Modal from '../components/Modal'
 import ActionDropdown from '../components/ActionDropdown'
 import DataTable from '../components/DataTable'
@@ -171,7 +171,7 @@ export default function Purchases() {
   const removeItem = (index: number) => setItems(items.filter((_, i) => i !== index))
 
   const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0)
-  const tax = Math.round(subtotal * TAX_RATE)
+  const tax = Math.round(subtotal * getTaxRate())
   const total = subtotal + tax
 
   const hasSizes = (pendingProduct?.sizes?.length ?? 0) > 0

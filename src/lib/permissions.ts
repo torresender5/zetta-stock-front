@@ -22,6 +22,7 @@ export type ViewKey =
   | 'users'
   | 'profile'
   | 'suscripcion'
+  | 'settings'
 
 export const VIEW_ROLES: Record<ViewKey, Role[]> = {
   dashboard: ['admin', 'vendedor', 'inventario'],
@@ -39,6 +40,7 @@ export const VIEW_ROLES: Record<ViewKey, Role[]> = {
   users: ['admin'],
   profile: ['admin', 'vendedor', 'inventario'],
   suscripcion: ['admin', 'vendedor', 'inventario'],
+  settings: ['admin'],
 }
 
 export function can(role: Role | undefined, view: ViewKey): boolean {
@@ -88,6 +90,7 @@ export const DEFAULT_PLAN_VIEWS: Record<string, ViewKey[]> = {
     'accountsReceivable',
     'profile',
     'suscripcion',
+    'settings',
   ],
   basico: [
     'dashboard',
@@ -104,6 +107,7 @@ export const DEFAULT_PLAN_VIEWS: Record<string, ViewKey[]> = {
     'users',
     'profile',
     'suscripcion',
+    'settings',
   ],
   pro: [
     'dashboard',
@@ -121,6 +125,7 @@ export const DEFAULT_PLAN_VIEWS: Record<string, ViewKey[]> = {
     'users',
     'profile',
     'suscripcion',
+    'settings',
   ],
 }
 
@@ -164,4 +169,5 @@ export const VIEW_LABELS: Record<ViewKey, string> = {
   users: 'Usuarios',
   profile: 'Mi perfil',
   suscripcion: 'Suscripción',
+  settings: 'Configuración',
 }

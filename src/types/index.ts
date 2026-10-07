@@ -10,6 +10,29 @@ export interface PaginatedResponse<T> {
   meta: PaginationMeta
 }
 
+export type NotificationType =
+  | 'stock_low'
+  | 'apartado_due'
+  | 'subscription_expiring'
+  | 'subscription_expired'
+  | 'cash_open'
+
+export interface AppNotification {
+  id: number
+  companyId: number
+  userId?: number | null
+  type: NotificationType
+  title: string
+  body?: string | null
+  dedupeKey?: string | null
+  readAt?: string | null
+  createdAt: string
+}
+
+export interface NotificationListResponse extends PaginatedResponse<AppNotification> {
+  unread: number
+}
+
 export interface ProductQueryParams {
   page?: number
   limit?: number
@@ -36,6 +59,7 @@ export interface Product {
   purchasePrice: number
   salePrice: number
   stock: number
+  minStock?: number
   image?: string | null
   sizes?: ProductSize[] | null
   createdAt: string
@@ -141,6 +165,22 @@ export interface SaleQueryParams {
   paymentStatus?: 'paid' | 'pending' | 'cancelled' | ''
   startDate?: string
   endDate?: string
+}
+
+export interface InvoiceQueryParams {
+  page?: number
+  limit?: number
+  search?: string
+  status?: 'paid' | 'pending' | 'cancelled' | ''
+  startDate?: string
+  endDate?: string
+}
+
+export interface InvoiceStats {
+  paid: number
+  pending: number
+  cancelled: number
+  total: number
 }
 
 export interface SaleItem {
@@ -368,6 +408,21 @@ export interface TopProductReportRow {
   revenue: number
 }
 
+export interface TopClientReportRow {
+  clientId: number
+  name: string
+  purchases: number
+  totalSpent: number
+  itemCount: number
+}
+
+/** Respuesta de GET /dashboard/summary (agregados del panel principal). */
+export interface DashboardSummaryReport {
+  sales: SalesSummaryReport
+  topProducts: TopProductReportRow[]
+  topClients: TopClientReportRow[]
+}
+
 export interface PurchaseBySupplierRow {
   supplierId: number
   supplier: string
@@ -501,8 +556,16 @@ export interface PaymentOrder {
   amount: number
   concept: string
   status: 'pending' | 'paid' | 'rejected' | string
+  provider: string // manual | stripe | pabilo
+  currency: string // USD
+  checkoutUrl: string | null
   paidAt: string | null
   createdAt: string
+}
+
+export interface PaymentMethods {
+  stripe: boolean
+  pabilo: boolean
 }
 
 export interface MySubscriptionResponse {

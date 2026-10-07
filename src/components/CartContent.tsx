@@ -3,7 +3,7 @@ import { Trash2, Minus, Plus, ShoppingBag, X } from 'lucide-react'
 import { useCartStore } from '../stores/cartStore'
 import { useClientStore } from '../stores/clientStore'
 import { useSaleStore } from '../stores/saleStore'
-import { formatVes, TAX_RATE, todayLocal } from '../lib/utils'
+import { formatVes, getTaxRate, todayLocal } from '../lib/utils'
 import CurrencyToggle, { useDisplayCurrency } from './CurrencyToggle'
 import FullScreenLoader from './FullScreenLoader'
 import { ClientSelect } from './ClientSelect'
@@ -47,7 +47,7 @@ export default function CartContent({ variant = 'drawer', active = true, onClose
   }, [active])
 
   const subtotal = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0)
-  const tax = Math.round(subtotal * TAX_RATE)
+  const tax = Math.round(subtotal * getTaxRate())
   const total = subtotal + tax
   const itemCount = items.reduce((sum, i) => sum + i.quantity, 0)
 

@@ -5,7 +5,7 @@ import { useProductStore } from '../stores/productStore'
 import { useClientStore } from '../stores/clientStore'
 import { useSaleStore } from '../stores/saleStore'
 import { useRateStore } from '../stores/rateStore'
-import { formatVes, formatDateOnly, TAX_RATE, todayLocal, parseMoney } from '../lib/utils'
+import { formatVes, formatDateOnly, getTaxRate, todayLocal, parseMoney } from '../lib/utils'
 import Modal from '../components/Modal'
 import FullScreenLoader from '../components/FullScreenLoader'
 import ActionDropdown from '../components/ActionDropdown'
@@ -54,7 +54,7 @@ export default function Sales() {
   const {
     salesList, salesMeta, page, limit, loading, error,
     search, paymentStatusFilter, startDateFilter, endDateFilter,
-    fetchSalesPage, fetchInvoices, addSale, setPage, setLimit, updateSalePaymentStatus,
+    fetchSalesPage, addSale, setPage, setLimit, updateSalePaymentStatus,
     setSearch, setPaymentStatusFilter, setStartDateFilter, setEndDateFilter,
   } = useSaleStore()
   const navigate = useNavigate()
@@ -115,7 +115,6 @@ export default function Sales() {
     fetchAllProducts()
     fetchClients()
     fetchSalesPage()
-    fetchInvoices()
   }, [])
 
   useEffect(() => {
@@ -182,7 +181,7 @@ export default function Sales() {
   const removeItem = (index: number) => setItems(items.filter((_, i) => i !== index))
 
   const subtotal = items.reduce((sum, item) => sum + item.subtotal, 0)
-  const tax = Math.round(subtotal * TAX_RATE)
+  const tax = Math.round(subtotal * getTaxRate())
   const total = subtotal + tax
 
   const hasSizes = (pendingProduct?.sizes?.length ?? 0) > 0
