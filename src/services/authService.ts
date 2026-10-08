@@ -15,6 +15,8 @@ export interface AuthUser {
   companyAddress?: string | null
   companyCurrency?: string
   companyTaxRate?: number
+  /** true: el usuario aún no aceptó Términos/Privacidad (modal forzado). */
+  requiresLegalAcceptance: boolean
 }
 
 export interface CreateUserDto {
@@ -62,7 +64,14 @@ export interface LoginResponse {
   token?: string
 }
 
-export interface RegisterDto {
+/** Aceptación de los documentos legales (obligatoria, Ley OPDP 1733). */
+export interface ConsentFlagsDto {
+  acceptTerms: boolean
+  acceptPrivacy: boolean
+  over18: boolean
+}
+
+export interface RegisterDto extends ConsentFlagsDto {
   user: string
   email: string
   password: string
@@ -103,6 +112,7 @@ function userFromToken(token: string): AuthUser | null {
     companyAddress: payload.companyAddress != null ? String(payload.companyAddress) : null,
     companyCurrency: payload.companyCurrency != null ? String(payload.companyCurrency) : 'USD',
     companyTaxRate: payload.companyTaxRate != null ? Number(payload.companyTaxRate) : 19,
+    requiresLegalAcceptance: payload.requiresLegalAcceptance === true,
   }
 }
 
@@ -134,6 +144,13 @@ export const authService = {
 
   logout: () => {
     localStorage.removeItem('auth-token')
+  },
+
+  /** Aceptación forzada de Términos/Privacidad en el primer login. */
+  acceptLegal: async (dto: ConsentFlagsDto): Promise<{ user: AuthUser; token: string }> => {
+    const { data } = await api.post<LoginResponse>('/auth/accept-legal', dto)
+    const user = saveSession(data)
+    return { user, token: data.access_token || data.token || '' }
   },
 
   getTokenFromStorage: (): AuthUser | null => {

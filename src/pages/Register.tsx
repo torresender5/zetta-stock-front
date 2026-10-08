@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { UserPlus, Loader2, User, Building2 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
+import LegalConsentCheckbox from '../components/LegalConsentCheckbox'
 import type { RegisterDto } from '../services/authService'
 
 export default function Register() {
@@ -17,12 +18,17 @@ export default function Register() {
   const [document, setDocument] = useState('')
   const [phoneNumber, setPhoneNumber] = useState('')
   const [address, setAddress] = useState('')
+  const [consent, setConsent] = useState(false)
   const [error, setError] = useState('')
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
 
+    if (!consent) {
+      setError('Debes aceptar los Términos y la Política de Privacidad para continuar')
+      return
+    }
     if (password.length < 6) {
       setError('La contraseña debe tener al menos 6 caracteres')
       return
@@ -41,6 +47,9 @@ export default function Register() {
       phoneNumber: phoneNumber || undefined,
       address: address || undefined,
       companyName: accountType === 'EMPRESA' ? companyName || undefined : undefined,
+      acceptTerms: true,
+      acceptPrivacy: true,
+      over18: true,
     }
 
     const result = await register(payload)
@@ -195,10 +204,11 @@ export default function Register() {
                 className="w-full bg-white/5 border border-white/10 text-white rounded-xl px-4 py-3 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent transition-all"
               />
             </div>
+            <LegalConsentCheckbox checked={consent} onChange={setConsent} />
             <button
               type="submit"
-              disabled={loading}
-              className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white py-3 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all duration-200 font-medium flex items-center justify-center gap-2 disabled:opacity-50 shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 mt-2"
+              disabled={loading || !consent}
+              className="w-full bg-gradient-to-r from-violet-600 to-indigo-600 text-white py-3 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all duration-200 font-medium flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 mt-2"
             >
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
               {loading ? 'Creando...' : 'Crear Cuenta'}

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Check, Crown, Loader2, Sparkles, Zap } from 'lucide-react'
 import { useSubscriptionStore } from '../stores/subscriptionStore'
 import { formatUsd } from '../lib/utils'
+import { LEGAL_DOCS } from './legal/legalConfig'
 import type { Plan } from '../types'
 
 type Billing = 'monthly' | 'yearly'
@@ -129,7 +130,15 @@ export default function Plans() {
         </h1>
         <p className="text-muted-foreground text-base sm:text-lg">
           Empieza gratis con 30 días de prueba y crece cuando lo necesites. Sin
-          tarjeta de crédito.
+          tarjeta de crédito.{' '}
+          <Link
+            to="/reembolsos"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-violet-600 underline underline-offset-2"
+          >
+            Política de Reembolsos
+          </Link>
         </p>
       </div>
 
@@ -206,6 +215,17 @@ function PublicShell({ children }: { children: React.ReactNode }) {
       </header>
       <main className="max-w-6xl mx-auto px-5 pb-16">{children}</main>
       <footer className="border-t border-border/60 py-6 text-center text-sm text-muted-foreground">
+        <div className="flex flex-wrap justify-center gap-x-5 gap-y-2 mb-3">
+          {LEGAL_DOCS.map((doc) => (
+            <Link
+              key={doc.path}
+              to={doc.path}
+              className="hover:text-foreground transition-colors"
+            >
+              {doc.title}
+            </Link>
+          ))}
+        </div>
         © {new Date().getFullYear()} ZettaStock · Facturación e inventario para
         tu negocio
       </footer>

@@ -4,6 +4,7 @@ import {
   Building2,
   CreditCard,
   LayoutDashboard,
+  LifeBuoy,
   ListOrdered,
   LogOut,
   ShieldAlert,
@@ -20,6 +21,7 @@ const links = [
   { to: '/admin/ordenes', label: 'Órdenes de pago', icon: ListOrdered },
   { to: '/admin/suscripciones', label: 'Suscripciones', icon: ShieldAlert },
   { to: '/admin/negocio', label: 'Negocio', icon: BarChart3 },
+  { to: '/admin/tickets', label: 'Tickets', icon: LifeBuoy },
 ]
 
 export default function AdminLayout() {

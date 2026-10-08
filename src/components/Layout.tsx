@@ -5,6 +5,7 @@ import BottomNav from './BottomNav'
 import CartFab from './CartFab'
 import SubscriptionBanner from './SubscriptionBanner'
 import ExpiredLock from './ExpiredLock'
+import LegalAcceptanceModal from './LegalAcceptanceModal'
 import NotificationBell from './NotificationBell'
 import { useAuthStore } from '../stores/authStore'
 import { useSubscriptionStore } from '../stores/subscriptionStore'
@@ -41,11 +42,17 @@ export default function Layout() {
   const locked = expired && !location.pathname.startsWith('/suscripcion')
 
   if (locked) {
-    return <ExpiredLock />
+    return (
+      <>
+        <ExpiredLock />
+        <LegalAcceptanceModal />
+      </>
+    )
   }
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
+      <LegalAcceptanceModal />
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         <SubscriptionBanner />

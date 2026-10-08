@@ -4,7 +4,10 @@ import type {
   AdminCompany,
   AdminCompanyDetail,
   AdminDashboardData,
+  AdminTicket,
   AdminUser,
+  PaginatedResponse,
+  TicketQueryParams,
 } from '../types'
 
 export interface AdminBusinessQuery {
@@ -56,6 +59,35 @@ export const adminService = {
   getBusiness: async (query?: AdminBusinessQuery): Promise<AdminBusinessData> => {
     const { data } = await api.get<AdminBusinessData>('/admin/business', {
       params: query,
+    })
+    return data
+  },
+
+  getTickets: async (
+    params: TicketQueryParams = {}
+  ): Promise<PaginatedResponse<AdminTicket>> => {
+    const { data } = await api.get<PaginatedResponse<AdminTicket>>(
+      '/admin/tickets',
+      { params }
+    )
+    return data
+  },
+
+  getTicketById: async (id: string): Promise<AdminTicket> => {
+    const { data } = await api.get<AdminTicket>(`/admin/tickets/${id}`)
+    return data
+  },
+
+  replyTicket: async (id: string, body: string): Promise<AdminTicket> => {
+    const { data } = await api.post<AdminTicket>(`/admin/tickets/${id}/messages`, {
+      body,
+    })
+    return data
+  },
+
+  updateTicketStatus: async (id: string, status: string): Promise<AdminTicket> => {
+    const { data } = await api.patch<AdminTicket>(`/admin/tickets/${id}/status`, {
+      status,
     })
     return data
   },

@@ -8,6 +8,7 @@ import {
   BadgeAlert,
   Wallet,
   Inbox,
+  LifeBuoy,
 } from 'lucide-react'
 import { useNotificationStore } from '../stores/notificationStore'
 import type { AppNotification, NotificationType } from '../types'
@@ -18,6 +19,7 @@ const TYPE_ICONS: Record<NotificationType, typeof Bell> = {
   subscription_expiring: BadgeAlert,
   subscription_expired: BadgeAlert,
   cash_open: Wallet,
+  ticket_reply: LifeBuoy,
 }
 
 const TYPE_ROUTES: Record<NotificationType, string> = {
@@ -26,6 +28,7 @@ const TYPE_ROUTES: Record<NotificationType, string> = {
   subscription_expiring: '/suscripcion',
   subscription_expired: '/suscripcion',
   cash_open: '/caja',
+  ticket_reply: '/tickets',
 }
 
 function timeAgo(dateStr: string): string {

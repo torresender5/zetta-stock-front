@@ -25,9 +25,16 @@ import Reports from './pages/Reports'
 import UserManagement from './pages/UserManagement'
 import Profile from './pages/Profile'
 import Settings from './pages/Settings'
+import Tickets from './pages/Tickets'
+import TicketDetails from './pages/TicketDetails'
 import Login from './pages/Login'
 import Register from './pages/Register'
 import Plans from './pages/Plans'
+import Terminos from './pages/legal/Terminos'
+import Privacidad from './pages/legal/Privacidad'
+import Cookies from './pages/legal/Cookies'
+import Reembolsos from './pages/legal/Reembolsos'
+import AvisoLegal from './pages/legal/AvisoLegal'
 import Subscription from './pages/Subscription'
 import AdminLogin from './pages/AdminLogin'
 import AdminDashboard from './pages/AdminDashboard'
@@ -37,6 +44,7 @@ import AdminBusiness from './pages/AdminBusiness'
 import AdminPlans from './pages/AdminPlans'
 import AdminOrders from './pages/AdminOrders'
 import AdminSubscriptions from './pages/AdminSubscriptions'
+import AdminTickets from './pages/AdminTickets'
 import { useAuthStore } from './stores/authStore'
 
 export default function App() {
@@ -50,6 +58,11 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/planes" element={<Plans />} />
+      <Route path="/terminos" element={<Terminos />} />
+      <Route path="/privacidad" element={<Privacidad />} />
+      <Route path="/reembolsos" element={<Reembolsos />} />
+      <Route path="/cookies" element={<Cookies />} />
+      <Route path="/aviso-legal" element={<AvisoLegal />} />
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route
         element={
@@ -66,6 +79,7 @@ export default function App() {
         <Route path="/admin/suscripciones" element={<AdminSubscriptions />} />
         <Route path="/admin/usuarios" element={<AdminUsers />} />
         <Route path="/admin/negocio" element={<AdminBusiness />} />
+        <Route path="/admin/tickets" element={<AdminTickets />} />
       </Route>
       <Route element={
         <ProtectedRoute>
@@ -93,6 +107,8 @@ export default function App() {
         <Route path="/suscripcion" element={<RequireRole view="suscripcion"><Subscription /></RequireRole>} />
         <Route path="/perfil" element={<Profile />} />
         <Route path="/configuracion" element={<RequireRole view="settings"><Settings /></RequireRole>} />
+        <Route path="/tickets" element={<RequireRole view="tickets"><Tickets /></RequireRole>} />
+        <Route path="/tickets/:id" element={<RequireRole view="tickets"><TicketDetails /></RequireRole>} />
       </Route>
     </Routes>
   )

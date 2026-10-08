@@ -27,11 +27,13 @@ export const subscriptionService = {
     planId: number,
     period: 'monthly' | 'yearly',
     provider?: 'stripe' | 'pabilo' | 'manual',
+    acceptedTerms?: boolean,
   ): Promise<PurchaseResult> => {
     const { data } = await api.post<PurchaseResult>('/subscription/purchase', {
       planId,
       period,
       ...(provider ? { provider } : {}),
+      ...(acceptedTerms !== undefined ? { acceptedTerms } : {}),
     })
     return data
   },

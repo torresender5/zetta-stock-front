@@ -23,6 +23,7 @@ export type ViewKey =
   | 'profile'
   | 'suscripcion'
   | 'settings'
+  | 'tickets'
 
 export const VIEW_ROLES: Record<ViewKey, Role[]> = {
   dashboard: ['admin', 'vendedor', 'inventario'],
@@ -41,6 +42,8 @@ export const VIEW_ROLES: Record<ViewKey, Role[]> = {
   profile: ['admin', 'vendedor', 'inventario'],
   suscripcion: ['admin', 'vendedor', 'inventario'],
   settings: ['admin'],
+  // Solo el Administrador de la empresa puede abrir y gestionar tickets.
+  tickets: ['admin'],
 }
 
 export function can(role: Role | undefined, view: ViewKey): boolean {
@@ -91,6 +94,7 @@ export const DEFAULT_PLAN_VIEWS: Record<string, ViewKey[]> = {
     'profile',
     'suscripcion',
     'settings',
+    'tickets',
   ],
   basico: [
     'dashboard',
@@ -108,6 +112,7 @@ export const DEFAULT_PLAN_VIEWS: Record<string, ViewKey[]> = {
     'profile',
     'suscripcion',
     'settings',
+    'tickets',
   ],
   pro: [
     'dashboard',
@@ -126,6 +131,7 @@ export const DEFAULT_PLAN_VIEWS: Record<string, ViewKey[]> = {
     'profile',
     'suscripcion',
     'settings',
+    'tickets',
   ],
 }
 
@@ -170,4 +176,5 @@ export const VIEW_LABELS: Record<ViewKey, string> = {
   profile: 'Mi perfil',
   suscripcion: 'Suscripción',
   settings: 'Configuración',
+  tickets: 'Tickets',
 }

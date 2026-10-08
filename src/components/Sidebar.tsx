@@ -18,6 +18,7 @@ import {
   Shield,
   Crown,
   Settings,
+  LifeBuoy,
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { useSubscriptionStore } from '../stores/subscriptionStore'
@@ -38,6 +39,7 @@ const links: { to: string; label: string; icon: typeof LayoutDashboard; view: Vi
   { to: '/accounts-receivable', label: 'Cuentas por Cobrar', icon: HandCoins, view: 'accountsReceivable' },
   { to: '/reports', label: 'Reportes', icon: BarChart3, view: 'reports' },
   { to: '/suscripcion', label: 'Suscripción', icon: Crown, view: 'suscripcion' },
+  { to: '/tickets', label: 'Tickets', icon: LifeBuoy, view: 'tickets' },
   { to: '/perfil', label: 'Mi Perfil', icon: UserCircle, view: 'profile' },
   { to: '/users', label: 'Usuarios', icon: Shield, view: 'users' },
   { to: '/configuracion', label: 'Configuración', icon: Settings, view: 'settings' },

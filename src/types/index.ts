@@ -16,6 +16,7 @@ export type NotificationType =
   | 'subscription_expiring'
   | 'subscription_expired'
   | 'cash_open'
+  | 'ticket_reply'
 
 export interface AppNotification {
   id: number
@@ -711,4 +712,62 @@ export interface AdminBusinessData {
   lowStock: AdminLowStock[]
   receivables: AdminPortfolioRow[]
   payables: AdminPortfolioRow[]
+}
+
+// ---------------- Tickets de soporte ----------------
+
+export type TicketStatus = 'abierto' | 'pendiente' | 'en_proceso' | 'finalizado'
+
+export type TicketCategory = 'consulta' | 'pago' | 'falla' | 'otro'
+
+export const TICKET_STATUS_LABELS: Record<TicketStatus, string> = {
+  abierto: 'Abierto',
+  pendiente: 'Pendiente',
+  en_proceso: 'En proceso',
+  finalizado: 'Finalizado',
+}
+
+export const TICKET_CATEGORY_LABELS: Record<TicketCategory, string> = {
+  consulta: 'Solicitar información',
+  pago: 'Pago / suscripción',
+  falla: 'Reportar falla',
+  otro: 'Otro',
+}
+
+export interface TicketMessage {
+  id: number
+  ticketId: number
+  authorKind: 'empresa' | 'soporte'
+  authorId?: number | null
+  authorName: string
+  body: string
+  createdAt: string
+}
+
+export interface Ticket {
+  id: number
+  companyId: number
+  subject: string
+  category: TicketCategory
+  status: TicketStatus
+  image?: string | null
+  companyReadAt?: string | null
+  createdAt: string
+  updatedAt: string
+  messages?: TicketMessage[]
+  _count?: { messages: number }
+  lastMessageAt?: string | null
+  lastMessagePreview?: string | null
+}
+
+export interface AdminTicket extends Ticket {
+  company?: { id: number; name: string; kind: string }
+}
+
+export interface TicketQueryParams {
+  page?: number
+  limit?: number
+  search?: string
+  status?: TicketStatus
+  companyId?: number
 }

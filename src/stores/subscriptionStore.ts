@@ -14,6 +14,7 @@ interface SubscriptionStore {
     planId: number,
     period: 'monthly' | 'yearly',
     provider?: 'stripe' | 'pabilo' | 'manual',
+    acceptedTerms?: boolean,
   ) => Promise<{
     ok: boolean
     error?: string
@@ -62,10 +63,15 @@ export const useSubscriptionStore = create<SubscriptionStore>()((set, get) => ({
     }
   },
 
-  purchase: async (planId, period, provider) => {
+  purchase: async (planId, period, provider, acceptedTerms) => {
     set({ loading: true, error: null })
     try {
-      const result = await subscriptionService.purchase(planId, period, provider)
+      const result = await subscriptionService.purchase(
+        planId,
+        period,
+        provider,
+        acceptedTerms,
+      )
       set({ loading: false })
       if (!result.order?.checkoutUrl) {
         // Solo recarga la suscripción si no salimos al checkout del proveedor

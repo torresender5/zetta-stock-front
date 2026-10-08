@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import {
   authService,
   type AuthUser,
+  type ConsentFlagsDto,
   type RegisterDto,
   type CreateUserDto,
   type UpdateProfileDto,
@@ -23,6 +24,7 @@ interface AuthStore {
   hydrate: () => Promise<void>
   login: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>
   register: (dto: RegisterDto) => Promise<{ ok: boolean; error?: string }>
+  acceptLegal: (dto: ConsentFlagsDto) => Promise<{ ok: boolean; error?: string }>
   logout: () => void
   fetchUsers: () => Promise<void>
   createUser: (dto: CreateUserDto) => Promise<{ ok: boolean; error?: string }>
@@ -69,6 +71,19 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
       return { ok: true }
     } catch (err: any) {
       const message = err.response?.data?.message || 'Error al registrar usuario'
+      set({ error: message, loading: false })
+      return { ok: false, error: message }
+    }
+  },
+
+  acceptLegal: async (dto) => {
+    set({ loading: true, error: null })
+    try {
+      const { user } = await authService.acceptLegal(dto)
+      set({ user, loading: false })
+      return { ok: true }
+    } catch (err: any) {
+      const message = err.response?.data?.message || 'Error al registrar la aceptación'
       set({ error: message, loading: false })
       return { ok: false, error: message }
     }

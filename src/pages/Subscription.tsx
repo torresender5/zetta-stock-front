@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import {
   AlertTriangle,
   BadgeCheck,
@@ -30,6 +30,7 @@ import {
   subscriptionExpired,
 } from '../lib/plan'
 import type { PaymentOrder, Plan } from '../types'
+import { OPERADOR } from './legal/legalConfig'
 
 type Billing = 'monthly' | 'yearly'
 type PaymentMethod = 'stripe' | 'pabilo' | 'manual'
@@ -105,6 +106,7 @@ export default function Subscription() {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('manual')
   const [createdOrder, setCreatedOrder] = useState<PaymentOrder | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [searchParams, setSearchParams] = useSearchParams()
 
@@ -169,8 +171,9 @@ export default function Subscription() {
     setNotice(null)
     setBilling('monthly')
     setPaymentMethod(onlineMethods[0] ?? 'manual')
+    setAcceptedTerms(false)
     if (isFree(plan)) {
-      void handlePurchase(plan, 'monthly', 'manual')
+      void handlePurchase(plan, 'monthly', 'manual', false)
       return
     }
     setCheckout(plan)
@@ -180,11 +183,19 @@ export default function Subscription() {
     plan: Plan,
     period: Billing,
     method: PaymentMethod,
+    termsAccepted: boolean,
   ) => {
     setSubmitting(true)
     setNotice(null)
-    const provider = isFree(plan) ? undefined : method
-    const result = await purchase(plan.id, period, provider)
+    const free = isFree(plan)
+    const provider = free ? undefined : method
+    const result = await purchase(
+      plan.id,
+      period,
+      provider,
+      // Solo los planes de pago exigen la aceptación (la API la valida).
+      free ? undefined : termsAccepted,
+    )
     setSubmitting(false)
     if (!result.ok) {
       setNotice(result.error ?? 'Error al generar la orden')
@@ -208,6 +219,7 @@ export default function Subscription() {
     setCheckout(null)
     setCreatedOrder(null)
     setNotice(null)
+    setAcceptedTerms(false)
   }
 
   const checkoutPrice = useMemo(() => {
@@ -594,10 +606,87 @@ export default function Subscription() {
                 {notice}
               </p>
             )}
+
+            {/* Información obligatoria del contrato a distancia (Ley OPDP 1733) */}
+            <div className="rounded-2xl border border-border bg-muted/50 p-4 text-xs text-muted-foreground space-y-1.5">
+              <p>
+                <span className="font-semibold text-foreground">Vendedor:</span>{' '}
+                {OPERADOR.razonSocial} (ZettaStock) ·{' '}
+                <Link
+                  to="/aviso-legal"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-violet-600 underline underline-offset-2"
+                >
+                  Aviso Legal
+                </Link>
+              </p>
+              <p>
+                <span className="font-semibold text-foreground">Total a pagar:</span>{' '}
+                {formatUsd(checkoutPrice)} por el período{' '}
+                {billing === 'yearly' ? 'anual' : 'mensual'} · El IVA del 16% no
+                está incluido.
+              </p>
+              <p>
+                <span className="font-semibold text-foreground">Cargo único:</span>{' '}
+                no hay renovación automática ni cargos recurrentes; solo se
+                genera un nuevo pago si decides contratar otro período.
+              </p>
+              <p>
+                <span className="font-semibold text-foreground">Reembolsos:</span>{' '}
+                consulta la{' '}
+                <Link
+                  to="/reembolsos"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-violet-600 underline underline-offset-2"
+                >
+                  Política de Reembolsos y Cancelación
+                </Link>
+                .
+              </p>
+            </div>
+
+            <label
+              htmlFor="checkout-accepted-terms"
+              className="flex items-start gap-3 rounded-2xl border border-border p-4 cursor-pointer transition-colors hover:bg-muted/60"
+            >
+              <input
+                id="checkout-accepted-terms"
+                type="checkbox"
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 accent-violet-600 cursor-pointer"
+              />
+              <span className="text-sm text-muted-foreground leading-relaxed">
+                Acepto los{' '}
+                <Link
+                  to="/terminos"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-violet-600 underline underline-offset-2"
+                >
+                  Términos y Condiciones
+                </Link>{' '}
+                y la{' '}
+                <Link
+                  to="/reembolsos"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-violet-600 underline underline-offset-2"
+                >
+                  Política de Reembolsos
+                </Link>
+                .
+              </span>
+            </label>
+
             <button
-              disabled={submitting}
-              onClick={() => void handlePurchase(checkout, billing, paymentMethod)}
-              className="w-full py-3 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer"
+              disabled={submitting || !acceptedTerms}
+              onClick={() =>
+                void handlePurchase(checkout, billing, paymentMethod, acceptedTerms)
+              }
+              className="w-full py-3 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold hover:opacity-90 transition-opacity disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
             >
               {submitting ? (
                 <>
