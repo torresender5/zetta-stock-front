@@ -24,6 +24,7 @@ import AccountsReceivable from './pages/AccountsReceivable'
 import Reports from './pages/Reports'
 import UserManagement from './pages/UserManagement'
 import Profile from './pages/Profile'
+import Notifications from './pages/Notifications'
 import Settings from './pages/Settings'
 import Tickets from './pages/Tickets'
 import TicketDetails from './pages/TicketDetails'
@@ -45,6 +46,7 @@ import AdminPlans from './pages/AdminPlans'
 import AdminOrders from './pages/AdminOrders'
 import AdminSubscriptions from './pages/AdminSubscriptions'
 import AdminTickets from './pages/AdminTickets'
+import AdminNotifications from './pages/AdminNotifications'
 import { useAuthStore } from './stores/authStore'
 
 export default function App() {
@@ -80,6 +82,7 @@ export default function App() {
         <Route path="/admin/usuarios" element={<AdminUsers />} />
         <Route path="/admin/negocio" element={<AdminBusiness />} />
         <Route path="/admin/tickets" element={<AdminTickets />} />
+        <Route path="/admin/notificaciones" element={<AdminNotifications />} />
       </Route>
       <Route element={
         <ProtectedRoute>
@@ -106,6 +109,7 @@ export default function App() {
         <Route path="/users" element={<RequireRole view="users"><UserManagement /></RequireRole>} />
         <Route path="/suscripcion" element={<RequireRole view="suscripcion"><Subscription /></RequireRole>} />
         <Route path="/perfil" element={<Profile />} />
+        <Route path="/notificaciones" element={<Notifications />} />
         <Route path="/configuracion" element={<RequireRole view="settings"><Settings /></RequireRole>} />
         <Route path="/tickets" element={<RequireRole view="tickets"><Tickets /></RequireRole>} />
         <Route path="/tickets/:id" element={<RequireRole view="tickets"><TicketDetails /></RequireRole>} />

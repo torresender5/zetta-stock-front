@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Minus, Trash2, FileText, CheckCircle, Clock, XCircle, ShoppingBag, AlertTriangle, Info, Search, Calendar, RefreshCw } from 'lucide-react'
+import { Plus, Minus, Trash2, FileText, CheckCircle, Clock, XCircle, ShoppingBag, AlertTriangle, Info, Search, Calendar, RefreshCw, ScanBarcode } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { useProductStore } from '../stores/productStore'
 import { useClientStore } from '../stores/clientStore'
@@ -14,6 +14,9 @@ import MoneyInput from '../components/MoneyInput'
 import CurrencyToggle, { useDisplayCurrency } from '../components/CurrencyToggle'
 import { ProductSelect } from '../components/ProductSelect'
 import { ClientSelect } from '../components/ClientSelect'
+import BarcodeScannerModal from '../components/BarcodeScannerModal'
+import { productService } from '../services/productService'
+import { useBarcodeWedge } from '../hooks/useBarcodeWedge'
 import type { Column } from '../components/DataTable/types'
 import type { Sale, SaleItem, Product, PaymentMethod } from '../types'
 
@@ -80,6 +83,8 @@ export default function Sales() {
   const [creating, setCreating] = useState(false)
   const creatingRef = useRef(false)
   const [searchInput, setSearchInput] = useState(search)
+  const [isScannerOpen, setIsScannerOpen] = useState(false)
+  const [scanError, setScanError] = useState<string | null>(null)
 
   const vesOf = (usd: number) => (rate && rate > 0 ? formatVes(usd * rate) : null)
 
@@ -144,6 +149,26 @@ export default function Sales() {
     setPendingSize('')
     setPendingQty(1)
   }
+
+  const handleScan = async (code: string) => {
+    setScanError(null)
+    setIsScannerOpen(false)
+    try {
+      const product = await productService.findByBarcode(code)
+      if (product.stock <= 0) {
+        setScanError(`Sin stock disponible: ${product.name}`)
+        return
+      }
+      setPendingProduct(product)
+      setPendingSize('')
+      setPendingQty(1)
+      setDraftProductId(product.id)
+    } catch {
+      setScanError(`No se encontró un producto con el código "${code}"`)
+    }
+  }
+
+  useBarcodeWedge(handleScan, isModalOpen && !isScannerOpen && !pendingProduct)
 
   const closeAddModal = () => setPendingProduct(null)
 
@@ -524,7 +549,20 @@ export default function Sales() {
               >
                 <Plus className="w-3 h-3" /> Agregar producto
               </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setScanError(null)
+                  setIsScannerOpen(true)
+                }}
+                className="w-full sm:w-auto flex items-center justify-center gap-1.5 text-sm font-medium text-white bg-gradient-to-r from-violet-600 to-indigo-600 rounded-xl px-5 py-2 hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25"
+              >
+                <ScanBarcode className="w-4 h-4" /> Escanear
+              </button>
             </div>
+            {scanError && (
+              <div className="mt-2 p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm">{scanError}</div>
+            )}
           </div>
             {items.length === 0 ? (
               <p className="text-sm text-gray-500 py-4 text-center border border-dashed border-gray-200 rounded-xl">Agrega productos a la venta</p>
@@ -729,6 +767,12 @@ export default function Sales() {
           </div>
         )}
       </Modal>
+
+      <BarcodeScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onDetected={handleScan}
+      />
 
       <Modal isOpen={!!cancelSale} onClose={() => { if (!submitting) setCancelSale(null) }} title="Cancelar Venta">
         <div className="space-y-5">

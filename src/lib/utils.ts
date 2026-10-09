@@ -113,3 +113,20 @@ export function downloadBlob(blob: Blob, filename: string): void {
   document.body.removeChild(link)
   URL.revokeObjectURL(url)
 }
+
+/** Fecha relativa legible: "ahora", "hace 5 min", "ayer", "hace 3 días"… */
+export function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const minutes = Math.floor(diff / 60000)
+  if (minutes < 1) return 'ahora'
+  if (minutes < 60) return `hace ${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `hace ${hours} h`
+  const days = Math.floor(hours / 24)
+  if (days === 1) return 'ayer'
+  if (days < 7) return `hace ${days} días`
+  return new Date(dateStr).toLocaleDateString('es-CO', {
+    day: 'numeric',
+    month: 'short',
+  })
+}

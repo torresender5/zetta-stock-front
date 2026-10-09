@@ -17,6 +17,7 @@ export type NotificationType =
   | 'subscription_expired'
   | 'cash_open'
   | 'ticket_reply'
+  | 'announcement'
 
 export interface AppNotification {
   id: number
@@ -26,6 +27,7 @@ export interface AppNotification {
   title: string
   body?: string | null
   dedupeKey?: string | null
+  targetLabel?: string | null
   readAt?: string | null
   createdAt: string
 }
@@ -55,6 +57,7 @@ export interface Product {
   code: string
   type: string
   sku: string
+  barcode?: string | null
   category: string
   categoryId?: string | null
   purchasePrice: number
@@ -680,6 +683,38 @@ export interface AdminUser {
   companyId: number | null
   companyName: string | null
   companyActive: boolean | null
+}
+
+export type AnnouncementTargetKind =
+  | 'user'
+  | 'company'
+  | 'all_companies'
+  | 'role'
+  | 'all_users'
+
+export type AnnouncementRole = 'admin' | 'vendedor' | 'inventario'
+
+export interface AnnouncementTargets {
+  kind: AnnouncementTargetKind
+  userIds?: number[]
+  companyIds?: number[]
+  role?: AnnouncementRole
+}
+
+export interface CreateAnnouncementResult {
+  dedupeKey: string
+  targetLabel: string
+  count: number
+}
+
+export interface AdminAnnouncement {
+  dedupeKey: string | null
+  title: string
+  body: string | null
+  targetLabel: string | null
+  createdAt: string
+  recipients: number
+  readCount: number
 }
 
 export interface AdminTopProduct {

@@ -14,6 +14,12 @@ export const productService = {
     return data
   },
 
+  findByBarcode: async (code: string): Promise<Product> => {
+    const trimmed = code.trim()
+    const { data } = await api.get<Product>(`/products/barcode/${encodeURIComponent(trimmed)}`)
+    return data
+  },
+
   create: async (product: CreateProductDto): Promise<Product> => {
     const { data } = await api.post<Product>('/products', product)
     return data

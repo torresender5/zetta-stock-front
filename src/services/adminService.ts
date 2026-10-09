@@ -1,11 +1,14 @@
 import api from '../lib/api'
 import type {
+  AdminAnnouncement,
   AdminBusinessData,
   AdminCompany,
   AdminCompanyDetail,
   AdminDashboardData,
   AdminTicket,
   AdminUser,
+  AnnouncementTargets,
+  CreateAnnouncementResult,
   PaginatedResponse,
   TicketQueryParams,
 } from '../types'
@@ -89,6 +92,29 @@ export const adminService = {
     const { data } = await api.patch<AdminTicket>(`/admin/tickets/${id}/status`, {
       status,
     })
+    return data
+  },
+
+  createNotification: async (payload: {
+    title: string
+    body?: string
+    targets: AnnouncementTargets
+  }): Promise<CreateAnnouncementResult> => {
+    const { data } = await api.post<CreateAnnouncementResult>(
+      '/admin/notifications',
+      payload
+    )
+    return data
+  },
+
+  getNotifications: async (params: {
+    page: number
+    limit: number
+  }): Promise<PaginatedResponse<AdminAnnouncement>> => {
+    const { data } = await api.get<PaginatedResponse<AdminAnnouncement>>(
+      '/admin/notifications',
+      { params }
+    )
     return data
   },
 }

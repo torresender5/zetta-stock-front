@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Trash2, Minus, Plus, ShoppingBag, X } from 'lucide-react'
+import { Trash2, Minus, Plus, ShoppingBag, X, ScanBarcode } from 'lucide-react'
 import { useCartStore } from '../stores/cartStore'
 import { useClientStore } from '../stores/clientStore'
 import { useSaleStore } from '../stores/saleStore'
@@ -7,8 +7,12 @@ import { formatVes, getTaxRate, todayLocal } from '../lib/utils'
 import CurrencyToggle, { useDisplayCurrency } from './CurrencyToggle'
 import FullScreenLoader from './FullScreenLoader'
 import { ClientSelect } from './ClientSelect'
+import Modal from './Modal'
+import BarcodeScannerModal from './BarcodeScannerModal'
+import { productService } from '../services/productService'
+import { useBarcodeWedge } from '../hooks/useBarcodeWedge'
 import { useNavigate } from 'react-router-dom'
-import type { PaymentMethod } from '../types'
+import type { PaymentMethod, Product } from '../types'
 
 const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: 'cash', label: 'Efectivo' },
@@ -26,7 +30,7 @@ interface CartContentProps {
 }
 
 export default function CartContent({ variant = 'drawer', active = true, onClose }: CartContentProps) {
-  const { items, removeItem, updateQuantity, clear } = useCartStore()
+  const { items, addItem, removeItem, updateQuantity, clear } = useCartStore()
   const { allClients, fetchClients } = useClientStore()
   const { addSale } = useSaleStore()
   const navigate = useNavigate()
@@ -37,6 +41,9 @@ export default function CartContent({ variant = 'drawer', active = true, onClose
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash')
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
+  const [isScannerOpen, setIsScannerOpen] = useState(false)
+  const [scanError, setScanError] = useState<string | null>(null)
+  const [sizeProduct, setSizeProduct] = useState<Product | null>(null)
 
   const vesOf = (usd: number) => (rate && rate > 0 ? formatVes(usd * rate) : null)
 
@@ -45,6 +52,40 @@ export default function CartContent({ variant = 'drawer', active = true, onClose
       fetchClients()
     }
   }, [active])
+
+  const addProductToCart = (product: Product, size?: string) => {
+    const sizeObj = size && product.sizes ? product.sizes.find((s) => s.size === size) : null
+    const maxStock = sizeObj ? (sizeObj.stock ?? 0) : product.stock
+    if (maxStock <= 0) {
+      setScanError(`Sin stock disponible: ${product.name}`)
+      return
+    }
+    setScanError(null)
+    addItem({
+      productId: product.id,
+      productName: product.name,
+      size,
+      unitPrice: product.salePrice,
+      maxStock,
+    })
+  }
+
+  const handleScan = async (code: string) => {
+    setScanError(null)
+    setIsScannerOpen(false)
+    try {
+      const product = await productService.findByBarcode(code)
+      if ((product.sizes ?? []).length > 0) {
+        setSizeProduct(product)
+        return
+      }
+      addProductToCart(product)
+    } catch {
+      setScanError(`No se encontró un producto con el código "${code}"`)
+    }
+  }
+
+  useBarcodeWedge(handleScan, active && !isScannerOpen && !sizeProduct)
 
   const subtotal = items.reduce((sum, i) => sum + i.unitPrice * i.quantity, 0)
   const tax = Math.round(subtotal * getTaxRate())
@@ -131,12 +172,40 @@ export default function CartContent({ variant = 'drawer', active = true, onClose
         <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground p-8">
           <ShoppingBag className="w-12 h-12 mb-3 opacity-40" aria-hidden="true" />
           <p className="text-sm">El carrito está vacío</p>
-          <p className="text-xs mt-1">Agrega productos desde el catálogo</p>
+          <p className="text-xs mt-1">Agrega productos desde el catálogo o escanea un código</p>
+          <button
+            type="button"
+            onClick={() => {
+              setScanError(null)
+              setIsScannerOpen(true)
+            }}
+            className="mt-4 flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-white bg-gradient-to-r from-violet-600 to-indigo-600 rounded-xl hover:from-violet-700 hover:to-indigo-700 transition-all shadow-lg shadow-violet-500/25 cursor-pointer"
+          >
+            <ScanBarcode className="w-4 h-4" /> Escanear
+          </button>
+          {scanError && (
+            <div className="mt-3 p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm text-left">
+              {scanError}
+            </div>
+          )}
         </div>
       ) : (
         <div className="flex-1 overflow-y-auto">
           {/* Cart items */}
           <div className="p-4 space-y-3">
+            <button
+              type="button"
+              onClick={() => {
+                setScanError(null)
+                setIsScannerOpen(true)
+              }}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium text-violet-600 border border-violet-200 bg-violet-50 rounded-xl hover:bg-violet-100 transition-colors cursor-pointer"
+            >
+              <ScanBarcode className="w-4 h-4" /> Escanear código de barras
+            </button>
+            {scanError && (
+              <div className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm">{scanError}</div>
+            )}
             {items.map((item) => (
               <div key={`${item.productId}_${item.size || ''}`} className="flex gap-3 items-start bg-background rounded-xl p-3 border border-border">
                 <div className="flex-1 min-w-0">
@@ -298,6 +367,57 @@ export default function CartContent({ variant = 'drawer', active = true, onClose
           </div>
         </div>
       )}
+
+      <BarcodeScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onDetected={handleScan}
+      />
+
+      <Modal
+        isOpen={!!sizeProduct}
+        onClose={() => setSizeProduct(null)}
+        title={`Seleccionar talla - ${sizeProduct?.name ?? ''}`}
+        size="md"
+      >
+        {sizeProduct && (
+          <div className="space-y-2">
+            {(sizeProduct.sizes ?? []).map((s) => {
+              const stock = s.stock ?? 0
+              const hasStock = stock > 0
+              return (
+                <button
+                  key={s.size}
+                  type="button"
+                  onClick={() => {
+                    addProductToCart(sizeProduct, s.size)
+                    setSizeProduct(null)
+                  }}
+                  disabled={!hasStock}
+                  className={`w-full flex items-center justify-between p-3 rounded-xl border transition-colors ${
+                    hasStock
+                      ? 'border-gray-200 hover:border-violet-300 hover:bg-violet-50 cursor-pointer'
+                      : 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
+                  }`}
+                >
+                  <span className="font-medium text-gray-900">{s.size}</span>
+                  <span
+                    className={`inline-flex px-2.5 py-1 rounded-lg text-xs font-semibold ${
+                      stock === 0
+                        ? 'bg-red-50 text-red-600'
+                        : stock < 10
+                          ? 'bg-amber-50 text-amber-600'
+                          : 'bg-emerald-50 text-emerald-600'
+                    }`}
+                  >
+                    Stock: {stock}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </Modal>
 
       <FullScreenLoader loading={submitting} text="Registrando venta..." />
     </div>

@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   BarChart3,
+  BellRing,
   Building2,
   CreditCard,
   LayoutDashboard,
@@ -22,6 +23,7 @@ const links = [
   { to: '/admin/suscripciones', label: 'Suscripciones', icon: ShieldAlert },
   { to: '/admin/negocio', label: 'Negocio', icon: BarChart3 },
   { to: '/admin/tickets', label: 'Tickets', icon: LifeBuoy },
+  { to: '/admin/notificaciones', label: 'Notificaciones', icon: BellRing },
 ]
 
 export default function AdminLayout() {

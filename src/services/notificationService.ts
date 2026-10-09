@@ -1,10 +1,12 @@
 import api from '../lib/api'
 import type { NotificationListResponse, AppNotification } from '../types'
+import type { NotificationScope } from '../lib/notifications'
 
 export interface NotificationQueryParams {
   page?: number
   limit?: number
   unread?: boolean
+  scope?: NotificationScope
 }
 
 export const notificationService = {

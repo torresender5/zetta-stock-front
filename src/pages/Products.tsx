@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Plus, Search, Edit, Trash2, ShoppingCart, ShoppingBag, Package, ImageIcon, X, Ruler, Calendar, XCircle } from 'lucide-react'
+import { Plus, Search, Edit, Trash2, ShoppingCart, ShoppingBag, Package, ImageIcon, X, Ruler, Calendar, XCircle, ScanBarcode } from 'lucide-react'
 import { useProductStore } from '../stores/productStore'
 import { useCartStore } from '../stores/cartStore'
 import { useRateStore } from '../stores/rateStore'
@@ -10,6 +10,7 @@ import ActionDropdown from '../components/ActionDropdown'
 import CartPanel from '../components/CartPanel'
 import DataTable from '../components/DataTable'
 import ProductImageInput from '../components/ProductImageInput'
+import BarcodeScannerModal from '../components/BarcodeScannerModal'
 import MoneyInput from '../components/MoneyInput'
 import CurrencyToggle, { useDisplayCurrency } from '../components/CurrencyToggle'
 import { productService } from '../services/productService'
@@ -22,6 +23,7 @@ const emptyForm = {
   code: '',
   type: '',
   sku: '',
+  barcode: '',
   category: '',
   categoryId: null as string | null,
   purchasePrice: '',
@@ -60,6 +62,7 @@ export default function Products() {
   const [sizeSelectorProduct, setSizeSelectorProduct] = useState<Product | null>(null)
   const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const [autoGenerateCode, setAutoGenerateCode] = useState(false)
+  const [isScannerOpen, setIsScannerOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
 
@@ -89,6 +92,13 @@ export default function Products() {
     { key: 'name', header: 'Nombre', cellClassName: 'font-medium text-gray-900', truncate: true },
     { key: 'code', header: 'Código', hideBelow: 'lg', cellClassName: 'text-gray-500 font-mono text-xs' },
     { key: 'sku', header: 'SKU', hideBelow: 'lg', cellClassName: 'text-gray-500 font-mono text-xs' },
+    {
+      key: 'barcode',
+      header: 'Cód. barras',
+      hideBelow: 'xl',
+      cellClassName: 'text-gray-500 font-mono text-xs',
+      render: (p) => p.barcode || <span className="text-gray-300">—</span>,
+    },
     { key: 'type', header: 'Tipo', hideBelow: 'xl', cellClassName: 'text-gray-500' },
     {
       key: 'category',
@@ -167,6 +177,7 @@ export default function Products() {
       code: product.code,
       type: product.type,
       sku: product.sku,
+      barcode: product.barcode ?? '',
       category: product.category,
       categoryId: product.categoryId ?? null,
       purchasePrice: String(product.purchasePrice),
@@ -189,6 +200,7 @@ export default function Products() {
     setSubmitting(true)
     const payload = {
       ...form,
+      barcode: form.barcode.trim(),
       image: form.image.trim() || null,
       purchasePrice: parseMoney(form.purchasePrice),
       salePrice: parseMoney(form.salePrice),
@@ -325,7 +337,7 @@ export default function Products() {
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Buscar por nombre, SKU o código..."
+            placeholder="Buscar por nombre, SKU, código o código de barras..."
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-white border-0 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-violet-500 text-sm transition-all"
@@ -501,6 +513,26 @@ export default function Products() {
                 onChange={(e) => setForm({ ...form, type: e.target.value })}
                 className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all"
               />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1.5">Código de barras</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={form.barcode}
+                onChange={(e) => setForm({ ...form, barcode: e.target.value })}
+                placeholder="Escanear o digitar..."
+                autoComplete="off"
+                className="flex-1 border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all"
+              />
+              <button
+                type="button"
+                onClick={() => setIsScannerOpen(true)}
+                className="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium text-violet-600 border border-violet-200 bg-violet-50 rounded-xl hover:bg-violet-100 transition-colors shrink-0"
+              >
+                <ScanBarcode className="w-4 h-4" /> Escanear
+              </button>
             </div>
           </div>
           <div>
@@ -830,6 +862,15 @@ export default function Products() {
           <p className="text-sm text-gray-500 text-center py-4">Este producto no tiene tallas configuradas.</p>
         )}
       </Modal>
+
+      <BarcodeScannerModal
+        isOpen={isScannerOpen}
+        onClose={() => setIsScannerOpen(false)}
+        onDetected={(code) => {
+          setForm((f) => ({ ...f, barcode: code }))
+          setIsScannerOpen(false)
+        }}
+      />
 
       <CartPanel isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} />
     </div>
