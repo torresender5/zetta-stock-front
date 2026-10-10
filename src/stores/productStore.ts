@@ -27,6 +27,7 @@ interface ProductStore {
   updateProduct: (id: string, product: Partial<Product>) => Promise<Product>
   deleteProduct: (id: string) => Promise<void>
   updateStock: (id: string, quantity: number, size?: string) => Promise<void>
+  resetSession: () => void
 }
 
 export const useProductStore = create<ProductStore>()((set, get) => ({
@@ -167,4 +168,18 @@ export const useProductStore = create<ProductStore>()((set, get) => ({
       throw error
     }
   },
+
+  resetSession: () =>
+    set({
+      products: [],
+      meta: emptyMeta,
+      loading: false,
+      error: null,
+      page: 1,
+      limit: 10,
+      search: '',
+      categoryFilter: '',
+      startDateFilter: '',
+      endDateFilter: '',
+    }),
 }))

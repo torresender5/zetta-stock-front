@@ -18,6 +18,7 @@ interface CategoryStore {
   addCategory: (name: string) => Promise<{ ok: boolean; category?: Category; error?: string }>
   updateCategory: (id: string, name: string) => Promise<{ ok: boolean; category?: Category; error?: string }>
   deleteCategory: (id: string) => Promise<{ ok: boolean; error?: string }>
+  resetSession: () => void
 }
 
 export const useCategoryStore = create<CategoryStore>()((set, get) => ({
@@ -74,4 +75,7 @@ export const useCategoryStore = create<CategoryStore>()((set, get) => ({
       return { ok: false, error }
     }
   },
+
+  resetSession: () =>
+    set({ categories: [], loading: false, error: null }),
 }))

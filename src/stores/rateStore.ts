@@ -11,6 +11,7 @@ interface RateStore {
   error: string | null
   fetchRate: () => Promise<{ ok: boolean; error?: string }>
   refresh: () => Promise<{ ok: boolean; error?: string }>
+  resetSession: () => void
 }
 
 function applyCached(set: (partial: Partial<RateStore>) => void): void {
@@ -54,6 +55,14 @@ export const useRateStore = create<RateStore>()((set, get) => ({
     const result = await get().fetchRate()
     return result
   },
+
+  resetSession: () =>
+    set({
+      rate: readCachedRate()?.rate ?? null,
+      rateDate: readCachedRate()?.date ?? null,
+      loading: false,
+      error: null,
+    }),
 }))
 
 export function useRate(): number | null {

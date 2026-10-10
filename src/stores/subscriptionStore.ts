@@ -23,6 +23,7 @@ interface SubscriptionStore {
   }>
   paymentMethods: PaymentMethods | null
   fetchPaymentMethods: () => Promise<void>
+  resetSession: () => void
 }
 
 export const useSubscriptionStore = create<SubscriptionStore>()((set, get) => ({
@@ -101,4 +102,13 @@ export const useSubscriptionStore = create<SubscriptionStore>()((set, get) => ({
       set({ paymentMethods: null })
     }
   },
+
+  resetSession: () =>
+    set({
+      subscription: null,
+      paymentOrders: [],
+      loading: false,
+      error: null,
+      paymentMethods: null,
+    }),
 }))

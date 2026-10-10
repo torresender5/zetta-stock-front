@@ -74,6 +74,7 @@ interface SaleStore {
   ) => Promise<void>
   updateSale: (id: string, body: UpdateSaleDto) => Promise<{ ok: boolean; error?: string }>
   updateInvoiceStatus: (id: string, status: 'paid' | 'pending') => Promise<void>
+  resetSession: () => void
 }
 
 export const useSaleStore = create<SaleStore>()((set, get) => ({
@@ -324,4 +325,28 @@ export const useSaleStore = create<SaleStore>()((set, get) => ({
       throw new Error('Error al actualizar factura')
     }
   },
+
+  resetSession: () =>
+    set({
+      salesList: [],
+      salesMeta: emptyMeta,
+      page: 1,
+      limit: 10,
+      search: '',
+      paymentStatusFilter: '',
+      startDateFilter: '',
+      endDateFilter: '',
+      invoices: [],
+      invoicesMeta: emptyMeta,
+      invoicePage: 1,
+      invoiceLimit: 10,
+      invoiceSearch: '',
+      invoiceStatusFilter: '',
+      invoiceStartDate: '',
+      invoiceEndDate: '',
+      invoiceStats: emptyStats,
+      sale: null,
+      loading: false,
+      error: null,
+    }),
 }))

@@ -25,6 +25,7 @@ interface SupplierStore {
   addSupplier: (supplier: CreateSupplierDto) => Promise<Supplier>
   updateSupplier: (id: string, supplier: Partial<Supplier>) => Promise<void>
   deleteSupplier: (id: string) => Promise<void>
+  resetSession: () => void
 }
 
 export const useSupplierStore = create<SupplierStore>()((set, get) => ({
@@ -136,4 +137,18 @@ export const useSupplierStore = create<SupplierStore>()((set, get) => ({
       throw new Error('Error al eliminar proveedor')
     }
   },
+
+  resetSession: () =>
+    set({
+      suppliers: [],
+      allSuppliers: [],
+      meta: emptyMeta,
+      loading: false,
+      error: null,
+      page: 1,
+      limit: 10,
+      search: '',
+      startDateFilter: '',
+      endDateFilter: '',
+    }),
 }))

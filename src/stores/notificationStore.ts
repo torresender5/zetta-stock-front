@@ -42,6 +42,7 @@ interface NotificationStore {
 
   markRead: (id: number) => Promise<void>
   markAllRead: () => Promise<void>
+  resetSession: () => void
 }
 
 const markItemsRead = (items: AppNotification[], id: number): AppNotification[] =>
@@ -184,5 +185,21 @@ export const useNotificationStore = create<NotificationStore>()((set, get) => ({
     } catch {
       set({ error: 'Error al marcar las notificaciones' })
     }
+  },
+
+  resetSession: () => {
+    // Invalida cualquier fetchList en vuelo de la sesión anterior.
+    listRequestId++
+    set({
+      bells: { general: emptyBell(), tickets: emptyBell() },
+      error: null,
+      list: [],
+      listMeta: emptyMeta,
+      listUnread: 0,
+      listLoading: false,
+      filters: { scope: 'all', unreadOnly: false },
+      page: 1,
+      selected: null,
+    })
   },
 }))

@@ -9,6 +9,7 @@ import {
   type UpdateCompanyDto,
 } from '../services/authService'
 import type { Role } from '../lib/permissions'
+import { resetAllSessionStores } from './resetStores'
 
 export type { Role }
 export type { CreateUserDto }
@@ -54,6 +55,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
     set({ loading: true, error: null })
     try {
       const { user } = await authService.login(email, password)
+      resetAllSessionStores()
       set({ user, loading: false })
       return { ok: true }
     } catch (err: any) {
@@ -67,6 +69,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
     set({ loading: true, error: null })
     try {
       const { user } = await authService.register(dto)
+      resetAllSessionStores()
       set({ user, loading: false })
       return { ok: true }
     } catch (err: any) {
@@ -80,6 +83,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
     set({ loading: true, error: null })
     try {
       const { user } = await authService.acceptLegal(dto)
+      resetAllSessionStores()
       set({ user, loading: false })
       return { ok: true }
     } catch (err: any) {
@@ -91,6 +95,7 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
 
   logout: () => {
     authService.logout()
+    resetAllSessionStores()
     set({ user: null, users: [] })
   },
 

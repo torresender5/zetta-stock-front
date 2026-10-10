@@ -16,6 +16,7 @@ interface CartStore {
   removeItem: (productId: string, size?: string) => void
   updateQuantity: (productId: string, quantity: number, size?: string) => void
   clear: () => void
+  resetSession: () => void
 }
 
 export const useCartStore = create<CartStore>()(
@@ -52,6 +53,8 @@ export const useCartStore = create<CartStore>()(
           ),
         })),
       clear: () => set({ items: [] }),
+      // El carrito es multi-empresa: no debe cruzar sesiones.
+      resetSession: () => set({ items: [] }),
     }),
     { name: 'cart-store' }
   )

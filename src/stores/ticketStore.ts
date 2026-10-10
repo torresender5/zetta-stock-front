@@ -19,6 +19,7 @@ interface TicketStore {
   setSearch: (search: string) => void
   setStatusFilter: (status: TicketStatus | '') => void
   createTicket: (ticket: CreateTicketDto, image?: File | null) => Promise<Ticket>
+  resetSession: () => void
 }
 
 export const useTicketStore = create<TicketStore>()((set, get) => ({
@@ -77,4 +78,16 @@ export const useTicketStore = create<TicketStore>()((set, get) => ({
       throw new Error('Error al crear el ticket')
     }
   },
+
+  resetSession: () =>
+    set({
+      tickets: [],
+      meta: emptyMeta,
+      loading: false,
+      error: null,
+      page: 1,
+      limit: 10,
+      search: '',
+      statusFilter: '',
+    }),
 }))

@@ -1,5 +1,7 @@
 import axios from 'axios'
 import { useAuthStore } from '../stores/authStore'
+import { resetAllSessionStores } from '../stores/resetStores'
+import { clearAdminSession } from './adminAuth'
 
 export const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/'
 
@@ -29,8 +31,17 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      const authHeader = String(error.config?.headers?.Authorization ?? '')
+      if (authHeader.startsWith('Basic ')) {
+        // Credenciales de superadmin inválidas o vencidas.
+        clearAdminSession()
+        window.location.href = '/admin/login'
+        return Promise.reject(error)
+      }
+      // Token de usuario expirado/inválido: se limpia toda la sesión.
       localStorage.removeItem('auth-token')
-      useAuthStore.setState({ user: null })
+      resetAllSessionStores()
+      useAuthStore.setState({ user: null, users: [] })
       window.location.href = '/login'
     }
     // Plan vencido: los usuarios de empresa quedan bloqueados salvo la

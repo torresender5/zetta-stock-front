@@ -37,6 +37,7 @@ interface PurchaseStore {
   updatePurchasePaymentStatus: (id: string, status: 'paid' | 'pending') => Promise<void>
   updatePurchase: (id: string, purchase: UpdatePurchaseDto) => Promise<void>
   deletePurchase: (id: string) => Promise<void>
+  resetSession: () => void
 }
 
 export const usePurchaseStore = create<PurchaseStore>()((set, get) => ({
@@ -186,4 +187,20 @@ export const usePurchaseStore = create<PurchaseStore>()((set, get) => ({
       throw new Error('Error al eliminar compra')
     }
   },
+
+  resetSession: () =>
+    set({
+      purchases: [],
+      purchase: null,
+      meta: emptyMeta,
+      loading: false,
+      error: null,
+      page: 1,
+      limit: 10,
+      search: '',
+      supplierFilter: '',
+      paymentStatusFilter: '',
+      startDateFilter: '',
+      endDateFilter: '',
+    }),
 }))

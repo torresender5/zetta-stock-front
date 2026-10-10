@@ -83,6 +83,7 @@ export function canReadModule(
 export const DEFAULT_PLAN_VIEWS: Record<string, ViewKey[]> = {
   free: [
     'dashboard',
+    'caja',
     'products',
     'clients',
     'suppliers',

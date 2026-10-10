@@ -52,6 +52,7 @@ interface ApartadoStore {
     reason?: string,
     refundMethod?: PaymentMethod,
   ) => Promise<{ ok: boolean; error?: string }>
+  resetSession: () => void
 }
 
 export const useApartadoStore = create<ApartadoStore>()((set, get) => ({
@@ -200,6 +201,21 @@ export const useApartadoStore = create<ApartadoStore>()((set, get) => ({
       return { ok: false, error: message }
     }
   },
+
+  resetSession: () =>
+    set({
+      apartados: [],
+      meta: emptyMeta,
+      page: 1,
+      limit: 10,
+      statusFilter: '',
+      search: '',
+      startDateFilter: '',
+      endDateFilter: '',
+      apartado: null,
+      loading: false,
+      error: null,
+    }),
 }))
 
 function getErrorMessage(err: unknown, fallback: string): string {

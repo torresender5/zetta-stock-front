@@ -25,6 +25,7 @@ interface ClientStore {
   addClient: (client: CreateClientDto) => Promise<Client>
   updateClient: (id: string, client: Partial<Client>) => Promise<void>
   deleteClient: (id: string) => Promise<void>
+  resetSession: () => void
 }
 
 export const useClientStore = create<ClientStore>()((set, get) => ({
@@ -136,4 +137,18 @@ export const useClientStore = create<ClientStore>()((set, get) => ({
       throw error
     }
   },
+
+  resetSession: () =>
+    set({
+      clients: [],
+      allClients: [],
+      meta: emptyMeta,
+      loading: false,
+      error: null,
+      page: 1,
+      limit: 10,
+      search: '',
+      startDateFilter: '',
+      endDateFilter: '',
+    }),
 }))

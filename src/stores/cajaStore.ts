@@ -29,6 +29,7 @@ interface CajaStore {
     body: CreateCashMovementDto,
   ) => Promise<{ ok: boolean; error?: string }>
   clearActive: () => void
+  resetSession: () => void
 }
 
 export const useCajaStore = create<CajaStore>()((set, get) => ({
@@ -49,7 +50,14 @@ export const useCajaStore = create<CajaStore>()((set, get) => ({
         set({ summary: null })
       }
     } catch {
-      set({ error: 'Error al consultar la caja activa', loading: false })
+      // Sin caja confirmada no debe conservarse la anterior: puede ser de
+      // otra empresa/sesión (p.ej. al cambiar de usuario sin recargar).
+      set({
+        active: null,
+        summary: null,
+        error: 'Error al consultar la caja activa',
+        loading: false,
+      })
     }
   },
 
@@ -135,6 +143,9 @@ export const useCajaStore = create<CajaStore>()((set, get) => ({
   },
 
   clearActive: () => set({ active: null, summary: null }),
+
+  resetSession: () =>
+    set({ active: null, summary: null, registers: [], loading: false, error: null }),
 }))
 
 function getErrorMessage(err: unknown, fallback: string): string {
