@@ -34,15 +34,21 @@ api.interceptors.response.use(
       const authHeader = String(error.config?.headers?.Authorization ?? '')
       if (authHeader.startsWith('Basic ')) {
         // Credenciales de superadmin inválidas o vencidas.
-        clearAdminSession()
-        window.location.href = '/admin/login'
+        if (window.location.pathname !== '/admin/login') {
+          clearAdminSession()
+          window.location.href = '/admin/login'
+        }
         return Promise.reject(error)
       }
       // Token de usuario expirado/inválido: se limpia toda la sesión.
       localStorage.removeItem('auth-token')
       resetAllSessionStores()
       useAuthStore.setState({ user: null, users: [] })
-      window.location.href = '/login'
+      // Si el 401 viene del propio login, no redirigir: recargar la página
+      // borraría el estado del formulario y el mensaje de error visible.
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login'
+      }
     }
     // Plan vencido: los usuarios de empresa quedan bloqueados salvo la
     // pantalla de suscripción.

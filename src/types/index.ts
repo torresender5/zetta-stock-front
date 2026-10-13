@@ -18,10 +18,13 @@ export type NotificationType =
   | 'cash_open'
   | 'ticket_reply'
   | 'announcement'
+  | 'payment_verified'
+  | 'payment_rejected'
+  | 'payment_review'
 
 export interface AppNotification {
   id: number
-  companyId: number
+  companyId: number | null // null = notificación global del superadmin
   userId?: number | null
   type: NotificationType
   title: string
@@ -559,13 +562,50 @@ export interface PaymentOrder {
   period: string
   amount: number
   concept: string
-  status: 'pending' | 'paid' | 'rejected' | string
+  status: 'pending' | 'awaiting_reverify' | 'paid' | 'rejected' | string
   provider: string // manual | stripe | pabilo
   currency: string // USD
   checkoutUrl: string | null
   paidAt: string | null
   createdAt: string
+  // Pago manual (pago móvil / transferencia) con validación Pabilo
+  amountVes: number | null
+  fxRate: number | null
+  paymentMethod: string | null // movil | transferencia
+  bankReference: string | null
+  paymentDate: string | null
+  payerDni: string | null
+  payerPhone: string | null
+  payerBankCode: string | null
+  proofUrl: string | null
+  verifiedAt: string | null
+  verificationNote: string | null
 }
+
+/** Datos bancarios receptores de pagos manuales (configurados por el superadmin). */
+export interface PaymentDetails {
+  bankName: string | null
+  accountType: string | null
+  accountNumber: string | null
+  accountHolder: string | null
+  holderDocument: string | null
+  phone: string | null
+  email: string | null
+  instructions: string | null
+}
+
+export type PaymentProofPayload = {
+  bankReference: string
+  paymentMethod: 'movil' | 'transferencia'
+  paymentDate?: string
+  payerDni?: string
+  payerPhone?: string
+  payerBankCode?: string
+}
+
+export type PaymentVerificationResult =
+  | { status: 'paid' }
+  | { status: 'awaiting_reverify'; code: string; message: string }
 
 export interface PaymentMethods {
   stripe: boolean

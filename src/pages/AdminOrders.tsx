@@ -2,17 +2,21 @@ import { useEffect, useState } from 'react'
 import {
   CheckCircle2,
   Clock,
+  Image as ImageIcon,
   ListOrdered,
   Loader2,
   ShieldAlert,
   XCircle,
   Check,
+  RefreshCw,
 } from 'lucide-react'
 import { subscriptionService } from '../services/subscriptionService'
-import { formatUsd } from '../lib/utils'
+import { formatUsd, formatVes } from '../lib/utils'
 import type { PaymentOrder } from '../types'
 
 type AdminOrder = PaymentOrder & { companyId: number; companyName: string }
+
+const CONFIRMABLE = ['pending', 'awaiting_reverify']
 
 export default function AdminOrders() {
   const [orders, setOrders] = useState<AdminOrder[]>([])
@@ -114,8 +118,31 @@ export default function AdminOrders() {
                           ? 'tarjeta'
                           : order.provider === 'pabilo'
                             ? 'pabilo'
-                            : 'manual'}
+                            : order.paymentMethod === 'transferencia'
+                              ? 'transferencia'
+                              : order.provider === 'manual'
+                                ? 'pago móvil/transferencia'
+                                : 'manual'}
                       </span>
+                      {order.proofUrl && (
+                        <a
+                          href={order.proofUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-violet-600 hover:text-violet-700 underline underline-offset-2 mt-1"
+                        >
+                          <ImageIcon className="w-3 h-3" /> Ver comprobante
+                        </a>
+                      )}
+                      {(order.bankReference || order.amountVes) && (
+                        <span className="block text-xs text-muted-foreground/70 mt-0.5 tabular-nums">
+                          {order.bankReference
+                            ? `Ref. ${order.bankReference}`
+                            : ''}
+                          {order.bankReference && order.amountVes ? ' · ' : ''}
+                          {order.amountVes ? formatVes(order.amountVes) : ''}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 font-semibold text-foreground tabular-nums">
                       {formatUsd(order.amount)}
@@ -124,6 +151,10 @@ export default function AdminOrders() {
                       {order.status === 'pending' ? (
                         <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border bg-amber-50 text-amber-700 border-amber-200">
                           <Clock className="w-3 h-3" /> Pendiente
+                        </span>
+                      ) : order.status === 'awaiting_reverify' ? (
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border bg-blue-50 text-blue-700 border-blue-200">
+                          <RefreshCw className="w-3 h-3" /> En validación
                         </span>
                       ) : order.status === 'paid' ? (
                         <span className="inline-flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border bg-emerald-50 text-emerald-700 border-emerald-200">
@@ -143,7 +174,7 @@ export default function AdminOrders() {
                       })}
                     </td>
                     <td className="px-6 py-4">
-                      {order.status === 'pending' ? (
+                      {CONFIRMABLE.includes(order.status) ? (
                         <div className="flex gap-2 justify-end">
                           <button
                             onClick={() => void process(order.id, 'confirm')}

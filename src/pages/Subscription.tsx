@@ -12,7 +12,6 @@ import {
   Landmark,
   Loader2,
   Lock,
-  ShieldCheck,
   Smartphone,
   Sparkles,
   Users,
@@ -20,13 +19,13 @@ import {
   Zap,
 } from 'lucide-react'
 import Modal from '../components/Modal'
+import PaymentProofModal from '../components/PaymentProofModal'
 import { useSubscriptionStore } from '../stores/subscriptionStore'
 import { useRateStore } from '../stores/rateStore'
 import { formatUsd, formatVes } from '../lib/utils'
 import {
   daysUntil,
   formatSubscriptionEnd,
-  PAYMENT_INSTRUCTIONS,
   subscriptionExpired,
 } from '../lib/plan'
 import type { PaymentOrder, Plan } from '../types'
@@ -61,16 +60,20 @@ const METHOD_OPTIONS: Array<{
   },
   {
     key: 'manual',
-    label: 'Transferencia manual',
-    hint: 'Orden pendiente de confirmación por soporte',
+    label: 'Pago móvil o transferencia',
+    hint: 'Pagas desde tu banco y adjuntas el comprobante; lo validamos contra el movimiento real',
     Icon: Landmark,
   },
 ]
 
 const ORDER_STATUS: Record<string, { label: string; className: string }> = {
   pending: {
-    label: 'Pendiente',
+    label: 'Pendiente de pago',
     className: 'bg-amber-50 text-amber-700 border-amber-200',
+  },
+  awaiting_reverify: {
+    label: 'Validando pago',
+    className: 'bg-blue-50 text-blue-700 border-blue-200',
   },
   paid: {
     label: 'Pagada',
@@ -81,6 +84,8 @@ const ORDER_STATUS: Record<string, { label: string; className: string }> = {
     className: 'bg-red-50 text-red-700 border-red-200',
   },
 }
+
+const MANUAL_STATUSES = ['pending', 'awaiting_reverify', 'rejected']
 
 function isFree(plan: Plan) {
   return plan.priceMonthly === 0 && plan.priceYearly === 0
@@ -94,9 +99,11 @@ export default function Subscription() {
     loading,
     error,
     paymentMethods,
+    paymentDetails,
     fetchMySubscription,
     fetchPlans,
     fetchPaymentMethods,
+    fetchPaymentDetails,
     purchase,
   } = useSubscriptionStore()
   const rate = useRateStore((s) => s.rate)
@@ -105,6 +112,7 @@ export default function Subscription() {
   const [billing, setBilling] = useState<Billing>('monthly')
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('manual')
   const [createdOrder, setCreatedOrder] = useState<PaymentOrder | null>(null)
+  const [proofOrder, setProofOrder] = useState<PaymentOrder | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [acceptedTerms, setAcceptedTerms] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
@@ -114,6 +122,7 @@ export default function Subscription() {
     fetchMySubscription()
     if (plans.length === 0) fetchPlans()
     fetchPaymentMethods()
+    fetchPaymentDetails()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -195,6 +204,7 @@ export default function Subscription() {
       provider,
       // Solo los planes de pago exigen la aceptación (la API la valida).
       free ? undefined : termsAccepted,
+      rate || undefined,
     )
     setSubmitting(false)
     if (!result.ok) {
@@ -434,6 +444,9 @@ export default function Subscription() {
                   <th className="px-6 py-3 font-medium">Método</th>
                   <th className="px-6 py-3 font-medium">Estado</th>
                   <th className="px-6 py-3 font-medium">Fecha</th>
+                  <th className="px-6 py-3 font-medium">
+                    <span className="sr-only">Acciones</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
@@ -475,6 +488,18 @@ export default function Subscription() {
                           day: 'numeric',
                         })}
                       </td>
+                      <td className="px-6 py-3.5">
+                        {order.provider === 'manual' &&
+                          MANUAL_STATUSES.includes(order.status) && (
+                            <button
+                              type="button"
+                              onClick={() => setProofOrder(order)}
+                              className="text-xs font-semibold text-violet-600 hover:text-violet-700 underline underline-offset-2 cursor-pointer"
+                            >
+                              {order.proofUrl ? 'Ver / re-validar' : 'Completar'}
+                            </button>
+                          )}
+                      </td>
                     </tr>
                   )
                 })}
@@ -492,42 +517,38 @@ export default function Subscription() {
         size="md"
       >
         {checkout && createdOrder ? (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
-              <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
-              <div>
-                <p className="text-sm font-semibold text-emerald-800">
-                  Tu orden quedó pendiente de pago
-                </p>
-                <p className="text-sm text-emerald-700">
-                  {checkout.name} · {formatUsd(createdOrder.amount)} ·{' '}
-                  {PERIOD_LABELS[createdOrder.period]}
-                </p>
+          createdOrder.provider === 'manual' ? (
+            <PaymentProofModal
+              order={createdOrder}
+              paymentDetails={paymentDetails}
+              onClose={closeModal}
+              onSettled={() => {
+                void fetchMySubscription()
+                setNotice('¡Pago verificado! Tu plan ya está activo.')
+              }}
+            />
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 p-4 rounded-2xl bg-emerald-50 border border-emerald-200">
+                <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
+                <div>
+                  <p className="text-sm font-semibold text-emerald-800">
+                    Tu orden quedó pendiente de pago
+                  </p>
+                  <p className="text-sm text-emerald-700">
+                    {checkout.name} · {formatUsd(createdOrder.amount)} ·{' '}
+                    {PERIOD_LABELS[createdOrder.period]}
+                  </p>
+                </div>
               </div>
+              <button
+                onClick={closeModal}
+                className="w-full py-3 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold hover:opacity-90 transition-opacity cursor-pointer"
+              >
+                Entendido
+              </button>
             </div>
-            <div className="space-y-2 p-5 rounded-2xl bg-muted/60">
-              <p className="text-sm font-semibold text-foreground mb-2">
-                <ShieldCheck className="inline w-4 h-4 mr-1 text-violet-500" />
-                ¿Cómo completar el pago?
-              </p>
-              <ol className="space-y-2">
-                {PAYMENT_INSTRUCTIONS.map((step, i) => (
-                  <li key={step} className="flex gap-2 text-sm text-muted-foreground">
-                    <span className="w-5 h-5 rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">
-                      {i + 1}
-                    </span>
-                    {step}
-                  </li>
-                ))}
-              </ol>
-            </div>
-            <button
-              onClick={closeModal}
-              className="w-full py-3 rounded-2xl bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-semibold hover:opacity-90 transition-opacity cursor-pointer"
-            >
-              Entendido
-            </button>
-          </div>
+          )
         ) : checkout ? (
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">{checkout.description}</p>
@@ -710,6 +731,23 @@ export default function Subscription() {
             </p>
           </div>
         ) : null}
+      </Modal>
+
+      {/* Modal de comprobante de pago manual */}
+      <Modal
+        isOpen={!!proofOrder}
+        onClose={() => setProofOrder(null)}
+        title="Comprobante de pago"
+        size="md"
+      >
+        {proofOrder && (
+          <PaymentProofModal
+            order={proofOrder}
+            paymentDetails={paymentDetails}
+            onClose={() => setProofOrder(null)}
+            onSettled={() => void fetchMySubscription()}
+          />
+        )}
       </Modal>
     </div>
   )

@@ -78,7 +78,7 @@ export default function Privacidad() {
       <ul>
         <li><strong>Cloudflare (R2)</strong> — almacenamiento de logotipos e imágenes.</li>
         <li><strong>Stripe</strong> — procesamiento de pagos con tarjeta.</li>
-        <li><strong>Pabilo</strong> — procesamiento de pagos.</li>
+        <li><strong>Pabilo</strong> — procesamiento de pagos online y validación de pagos manuales (pago móvil o transferencia) contra los movimientos reales de la cuenta bancaria.</li>
         <li><strong>Proveedor de alojamiento</strong> (VPS/servidores) — base de datos y aplicación.</li>
         <li><strong>Proveedor de correo (SMTP)</strong> — envío de correos transaccionales.</li>
       </ul>

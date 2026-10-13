@@ -59,7 +59,10 @@ export const useAuthStore = create<AuthStore>()((set, get) => ({
       set({ user, loading: false })
       return { ok: true }
     } catch (err: any) {
-      const message = err.response?.data?.message || 'Email o contraseña incorrectos'
+      const message =
+        err.response?.status === 401
+          ? 'Email o contraseña incorrectos'
+          : err.response?.data?.message || 'Error al iniciar sesión'
       set({ error: message, loading: false })
       return { ok: false, error: message }
     }

@@ -12,6 +12,10 @@ interface NotificationsDropdownProps {
   label: string
   linkTo: string
   emptyText?: string
+  /** Resuelve la ruta destino (por defecto, la del tenant). */
+  resolveRoute?: (notification: AppNotification) => string | null
+  /** Clases extra para el botón de la campana (p. ej. sobre fondo oscuro). */
+  buttonClassName?: string
 }
 
 export function NotificationsDropdown({
@@ -20,6 +24,8 @@ export function NotificationsDropdown({
   label,
   linkTo,
   emptyText = 'No tienes notificaciones',
+  resolveRoute = notificationRoute,
+  buttonClassName,
 }: NotificationsDropdownProps) {
   const [open, setOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -52,7 +58,7 @@ export function NotificationsDropdown({
   const handleSelect = (notification: AppNotification) => {
     if (!notification.readAt) markRead(notification.id)
     setOpen(false)
-    const route = notificationRoute(notification)
+    const route = resolveRoute(notification)
     if (route) navigate(route)
   }
 
@@ -62,7 +68,9 @@ export function NotificationsDropdown({
         type="button"
         onClick={handleOpen}
         aria-label={`${label}${unread > 0 ? ` (${unread} sin leer)` : ''}`}
-        className="relative p-2 rounded-xl text-gray-500 hover:text-foreground hover:bg-gray-100 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+        className={`relative p-2 rounded-xl transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 ${
+          buttonClassName ?? 'text-gray-500 hover:text-foreground hover:bg-gray-100'
+        }`}
       >
         <Icon className="w-5 h-5" />
         {unread > 0 && (

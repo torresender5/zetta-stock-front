@@ -19,7 +19,8 @@ export default function Reembolsos() {
       <ul>
         <li>
           Los planes de pago se contratan por un período elegido (mensual o anual) y se pagan
-          <strong> por adelantado</strong> mediante Stripe, Pabilo o transferencia manual.
+          <strong> por adelantado</strong> mediante Stripe, Pabilo o pago móvil/transferencia
+          manual (validado automáticamente contra el movimiento bancario).
         </li>
         <li>
           <strong>No hay renovación automática con cargo recurrente:</strong> al vencer tu

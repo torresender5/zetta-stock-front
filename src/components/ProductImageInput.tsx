@@ -9,6 +9,7 @@ interface ProductImageInputProps {
 }
 
 const ACCEPT = 'image/jpeg,image/png,image/webp,image/gif'
+const MAX_SIZE = 5 * 1024 * 1024
 
 export default function ProductImageInput({ value, onChange, onClearImage }: ProductImageInputProps) {
   const isTouchDevice = window.matchMedia('(pointer: coarse)').matches || navigator.maxTouchPoints > 0
@@ -16,6 +17,7 @@ export default function ProductImageInput({ value, onChange, onClearImage }: Pro
 
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(value)
+  const [fileError, setFileError] = useState<string | null>(null)
   const [cameraOpen, setCameraOpen] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [starting, setStarting] = useState(false)
@@ -27,7 +29,19 @@ export default function ProductImageInput({ value, onChange, onClearImage }: Pro
   const streamRef = useRef<MediaStream | null>(null)
 
   const selectFile = (f: File | null) => {
-    if (f && !f.type.startsWith('image/')) return
+    setFileError(null)
+    if (f) {
+      if (!f.type.startsWith('image/')) {
+        setFileError('Formato no válido. Usa JPG, PNG, WebP o GIF.')
+        return
+      }
+      if (f.size > MAX_SIZE) {
+        setFileError(
+          `La imagen pesa ${(f.size / (1024 * 1024)).toFixed(1)} MB. El máximo es 5 MB.`,
+        )
+        return
+      }
+    }
     setFile(f)
     setPreview(f ? URL.createObjectURL(f) : null)
     onChange(f)
@@ -36,6 +50,7 @@ export default function ProductImageInput({ value, onChange, onClearImage }: Pro
   const handleClear = () => {
     setFile(null)
     setPreview(null)
+    setFileError(null)
     onChange(null)
     onClearImage?.()
   }
@@ -128,9 +143,7 @@ export default function ProductImageInput({ value, onChange, onClearImage }: Pro
           e.preventDefault()
           e.stopPropagation()
           const dropped = e.dataTransfer.files?.[0]
-          if (dropped && dropped.type.startsWith('image/')) {
-            selectFile(dropped)
-          }
+          if (dropped) selectFile(dropped)
         }}
         className={`relative flex flex-col items-center justify-center w-full min-h-[180px] rounded-2xl border-2 border-dashed transition-all cursor-pointer ${dropCardClass}`}
       >
@@ -202,6 +215,7 @@ export default function ProductImageInput({ value, onChange, onClearImage }: Pro
           ref={fileInputRef}
           type="file"
           accept={ACCEPT}
+          aria-label="Seleccionar imagen del producto"
           onChange={(e) => {
             const selected = e.target.files?.[0] ?? null
             selectFile(selected)
@@ -210,6 +224,12 @@ export default function ProductImageInput({ value, onChange, onClearImage }: Pro
           className="hidden"
         />
       </div>
+
+      {fileError && (
+        <p role="alert" className="text-xs text-red-500 mt-2">
+          {fileError}
+        </p>
+      )}
 
       <Modal isOpen={cameraOpen} onClose={() => setCameraOpen(false)} title="Tomar foto" size="md">
         <div className="space-y-4">

@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { Product, PaginationMeta } from '../types'
 import { productService, type CreateProductDto } from '../services/productService'
+import { getApiErrorMessage } from '../lib/utils'
 
 const emptyMeta: PaginationMeta = { total: 0, page: 1, limit: 10, totalPages: 1 }
 
@@ -113,7 +114,7 @@ export const useProductStore = create<ProductStore>()((set, get) => ({
       await get().fetchProducts()
       return created
     } catch (error) {
-      set({ error: 'Error al crear producto', loading: false })
+      set({ error: getApiErrorMessage(error, 'Error al crear producto'), loading: false })
       throw error
     }
   },
@@ -126,7 +127,7 @@ export const useProductStore = create<ProductStore>()((set, get) => ({
       await get().fetchProducts()
       return updated
     } catch (error) {
-      set({ error: 'Error al actualizar producto', loading: false })
+      set({ error: getApiErrorMessage(error, 'Error al actualizar producto'), loading: false })
       throw error
     }
   },

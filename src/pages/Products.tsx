@@ -3,7 +3,7 @@ import { Plus, Search, Edit, Trash2, ShoppingCart, ShoppingBag, Package, ImageIc
 import { useProductStore } from '../stores/productStore'
 import { useCartStore } from '../stores/cartStore'
 import { useRateStore } from '../stores/rateStore'
-import { formatVes, parseMoney, generateProductCode } from '../lib/utils'
+import { formatVes, parseMoney, generateProductCode, getApiErrorMessage } from '../lib/utils'
 import { useCategoryStore } from '../stores/categoryStore'
 import Modal from '../components/Modal'
 import ActionDropdown from '../components/ActionDropdown'
@@ -32,6 +32,16 @@ const emptyForm = {
   minStock: 0,
   image: '',
   sizes: [] as ProductSize[],
+}
+
+/** Mensaje de validación bajo un campo del formulario de producto. */
+function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null
+  return (
+    <p id={`${id}-error`} role="alert" className="text-xs text-red-500 mt-1">
+      {message}
+    </p>
+  )
 }
 
 export default function Products() {
@@ -64,6 +74,8 @@ export default function Products() {
   const [autoGenerateCode, setAutoGenerateCode] = useState(false)
   const [isScannerOpen, setIsScannerOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({})
   const submittingRef = useRef(false)
 
   const vesOf = (usd: number) => (rate && rate > 0 ? formatVes(usd * rate) : null)
@@ -163,10 +175,18 @@ export default function Products() {
   }
 
   const openCreate = () => {
-    setForm(emptyForm)
+    const first = categories[0]
+    setForm({
+      ...emptyForm,
+      category: first?.name ?? '',
+      categoryId: first?.id ?? null,
+    })
     setEditingId(null)
     setImageFile(null)
     setAutoGenerateCode(false)
+    setSubmitError(null)
+    setFieldErrors({})
+    useProductStore.setState({ error: null })
     setIsModalOpen(true)
   }
 
@@ -190,12 +210,61 @@ export default function Products() {
     setEditingId(product.id)
     setImageFile(null)
     setAutoGenerateCode(false)
+    setSubmitError(null)
+    setFieldErrors({})
+    useProductStore.setState({ error: null })
     setIsModalOpen(true)
+  }
+
+  const clearFieldError = (key: string) =>
+    setFieldErrors((prev) => {
+      if (!prev[key]) return prev
+      const next = { ...prev }
+      delete next[key]
+      return next
+    })
+
+  const validateForm = (): Record<string, string> => {
+    const errs: Record<string, string> = {}
+    if (!form.name.trim()) errs.name = 'El nombre es obligatorio'
+    if (!form.sku.trim()) errs.sku = 'El SKU es obligatorio'
+    if (!form.code.trim()) errs.code = 'El código es obligatorio'
+    if (!form.type.trim()) errs.type = 'El tipo es obligatorio'
+    if (!form.category.trim()) {
+      errs.category =
+        categories.length === 0
+          ? 'No hay categorías: créala con "Nueva categoría"'
+          : 'Selecciona una categoría'
+    }
+    const purchase = form.purchasePrice.trim()
+    if (purchase !== '' && (!Number.isFinite(Number(purchase)) || Number(purchase) < 0)) {
+      errs.purchasePrice = 'Precio de compra inválido'
+    }
+    const sale = form.salePrice.trim()
+    if (sale === '' || !Number.isFinite(Number(sale)) || Number(sale) < 0) {
+      errs.salePrice = 'Ingresa un precio de venta válido'
+    }
+    if (!Number.isFinite(Number(form.stock)) || Number(form.stock) < 0) {
+      errs.stock = 'El stock no puede ser negativo'
+    }
+    if (!Number.isFinite(Number(form.minStock)) || Number(form.minStock) < 0) {
+      errs.minStock = 'El stock mínimo no puede ser negativo'
+    }
+    return errs
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (submittingRef.current) return
+    setSubmitError(null)
+    useProductStore.setState({ error: null })
+    const errs = validateForm()
+    setFieldErrors(errs)
+    const firstInvalid = Object.keys(errs)[0]
+    if (firstInvalid) {
+      document.getElementById(`pf-${firstInvalid}`)?.focus()
+      return
+    }
     submittingRef.current = true
     setSubmitting(true)
     const payload = {
@@ -216,9 +285,19 @@ export default function Products() {
         result = await updateProduct(editingId, payload)
       } else {
         result = await addProduct(payload)
+        // Si algo posterior falla, el reintento actualiza en vez de duplicar.
+        setEditingId(result.id)
       }
       if (imageFile) {
-        await productService.uploadImage(result.id, imageFile)
+        try {
+          await productService.uploadImage(result.id, imageFile)
+        } catch (err) {
+          const detail = getApiErrorMessage(err, 'Cambia la imagen o vuelve a intentarlo.')
+          setSubmitError(
+            `El producto se guardó, pero no se pudo subir la imagen. ${detail}`,
+          )
+          return
+        }
       }
       setIsModalOpen(false)
       setImageFile(null)
@@ -227,8 +306,13 @@ export default function Products() {
       } else {
         setPage(1)
       }
-    } catch {
-      // error se maneja en el store
+    } catch (err) {
+      setSubmitError(
+        getApiErrorMessage(
+          err,
+          editingId ? 'No se pudo actualizar el producto' : 'No se pudo crear el producto',
+        ),
+      )
     } finally {
       submittingRef.current = false
       setSubmitting(false)
@@ -448,42 +532,68 @@ export default function Products() {
         )}
       />
 
-      <Modal isOpen={isModalOpen} size='xl' onClose={() => setIsModalOpen(false)} title={editingId ? 'Editar Producto' : 'Nuevo Producto'}>
-        <form onSubmit={handleSubmit} className="space-y-5">
+      <Modal
+        isOpen={isModalOpen}
+        size='xl'
+        onClose={() => setIsModalOpen(false)}
+        title={editingId ? 'Editar Producto' : 'Nuevo Producto'}
+        loading={submitting}
+      >
+        <form onSubmit={handleSubmit} noValidate className="space-y-5">
+          {submitError && (
+            <div
+              role="alert"
+              className="p-3 bg-red-50 border border-red-100 text-red-600 rounded-xl text-sm"
+            >
+              {submitError}
+            </div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Nombre *</label>
+              <label htmlFor="pf-name" className="block text-sm font-medium text-gray-700 mb-1.5">Nombre *</label>
               <input
+                id="pf-name"
                 required
                 type="text"
                 value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                aria-invalid={!!fieldErrors.name}
+                aria-describedby={fieldErrors.name ? 'pf-name-error' : undefined}
+                onChange={(e) => { clearFieldError('name'); setForm({ ...form, name: e.target.value }) }}
                 className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all"
               />
+              <FieldError id="pf-name" message={fieldErrors.name} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">SKU *</label>
+              <label htmlFor="pf-sku" className="block text-sm font-medium text-gray-700 mb-1.5">SKU *</label>
               <input
+                id="pf-sku"
                 required
                 type="text"
                 value={form.sku}
-                onChange={(e) => setForm({ ...form, sku: e.target.value })}
+                aria-invalid={!!fieldErrors.sku}
+                aria-describedby={fieldErrors.sku ? 'pf-sku-error' : undefined}
+                onChange={(e) => { clearFieldError('sku'); setForm({ ...form, sku: e.target.value }) }}
                 className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all"
               />
+              <FieldError id="pf-sku" message={fieldErrors.sku} />
             </div>
 
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Código *</label>
+              <label htmlFor="pf-code" className="block text-sm font-medium text-gray-700 mb-1.5">Código *</label>
               <input
+                id="pf-code"
                 required
                 type="text"
                 value={form.code}
                 disabled={autoGenerateCode}
-                onChange={(e) => setForm({ ...form, code: e.target.value })}
+                aria-invalid={!!fieldErrors.code}
+                aria-describedby={fieldErrors.code ? 'pf-code-error' : undefined}
+                onChange={(e) => { clearFieldError('code'); setForm({ ...form, code: e.target.value }) }}
                 className={`w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all ${autoGenerateCode ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
               />
+              <FieldError id="pf-code" message={fieldErrors.code} />
             </div>
             <div className="flex items-end">
               <label className="flex items-center gap-2 cursor-pointer">
@@ -498,6 +608,7 @@ export default function Products() {
                     } else {
                       setForm({ ...form, code: '' })
                     }
+                    clearFieldError('code')
                   }}
                   className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
                 />
@@ -505,20 +616,25 @@ export default function Products() {
               </label>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Tipo *</label>
+              <label htmlFor="pf-type" className="block text-sm font-medium text-gray-700 mb-1.5">Tipo *</label>
               <input
+                id="pf-type"
                 required
                 type="text"
                 value={form.type}
-                onChange={(e) => setForm({ ...form, type: e.target.value })}
+                aria-invalid={!!fieldErrors.type}
+                aria-describedby={fieldErrors.type ? 'pf-type-error' : undefined}
+                onChange={(e) => { clearFieldError('type'); setForm({ ...form, type: e.target.value }) }}
                 className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all"
               />
+              <FieldError id="pf-type" message={fieldErrors.type} />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Código de barras</label>
+            <label htmlFor="pf-barcode" className="block text-sm font-medium text-gray-700 mb-1.5">Código de barras</label>
             <div className="flex gap-2">
               <input
+                id="pf-barcode"
                 type="text"
                 value={form.barcode}
                 onChange={(e) => setForm({ ...form, barcode: e.target.value })}
@@ -536,8 +652,9 @@ export default function Products() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1.5">Descripción</label>
+            <label htmlFor="pf-description" className="block text-sm font-medium text-gray-700 mb-1.5">Descripción</label>
             <textarea
+              id="pf-description"
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all"
@@ -554,7 +671,7 @@ export default function Products() {
           </div>
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-sm font-medium text-gray-700">Categoría</label>
+              <label htmlFor="pf-category" className="block text-sm font-medium text-gray-700">Categoría</label>
               <button
                 type="button"
                 onClick={openManageCategories}
@@ -564,11 +681,15 @@ export default function Products() {
               </button>
             </div>
             <select
+              id="pf-category"
               required
               value={form.category}
+              aria-invalid={!!fieldErrors.category}
+              aria-describedby={fieldErrors.category ? 'pf-category-error' : undefined}
               onChange={(e) => {
                 const name = e.target.value
                 const cat = categories.find((c) => c.name === name)
+                clearFieldError('category')
                 setForm({ ...form, category: name, categoryId: cat ? cat.id : null })
               }}
               className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all"
@@ -576,10 +697,12 @@ export default function Products() {
               {categories.length === 0 && <option value="">Cargando categorías...</option>}
               {categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
             </select>
+            <FieldError id="pf-category" message={fieldErrors.category} />
             <div className="mt-2">
               {showNewCategory ? (
                 <div className="flex items-center gap-2">
                   <input
+                    id="pf-new-category"
                     autoFocus
                     type="text"
                     value={newCategoryName}
@@ -637,6 +760,7 @@ export default function Products() {
                   <div key={i} className="flex items-center gap-2">
                     <input
                       type="text"
+                      aria-label={`Talla ${i + 1}`}
                       placeholder="Talla (S, M, L, 38...)"
                       value={s.size}
                       onChange={(e) => updateSize(i, 'size', e.target.value)}
@@ -645,6 +769,7 @@ export default function Products() {
                     <input
                       type="number"
                       min={0}
+                      aria-label={`Stock de la talla ${i + 1}`}
                       placeholder="Stock"
                       value={s.stock ?? 0}
                       onChange={(e) => updateSize(i, 'stock', Number(e.target.value))}
@@ -653,6 +778,7 @@ export default function Products() {
                     <button
                       type="button"
                       onClick={() => removeSize(i)}
+                      aria-label={`Eliminar talla ${i + 1}`}
                       className="p-2 rounded-xl hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors shrink-0"
                     >
                       <X className="w-4 h-4" />
@@ -664,49 +790,65 @@ export default function Products() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Precio Compra</label>
+              <label htmlFor="pf-purchasePrice" className="block text-sm font-medium text-gray-700 mb-1.5">Precio Compra</label>
               <MoneyInput
+                id="pf-purchasePrice"
                 value={form.purchasePrice}
-                onChange={(v) => setForm({ ...form, purchasePrice: v })}
+                aria-invalid={!!fieldErrors.purchasePrice}
+                aria-describedby={fieldErrors.purchasePrice ? 'pf-purchasePrice-error' : undefined}
+                onChange={(v) => { clearFieldError('purchasePrice'); setForm({ ...form, purchasePrice: v }) }}
               />
               {vesOf(parseMoney(form.purchasePrice)) && (
                 <p className="text-xs text-gray-400 mt-1 tabular-nums">= {vesOf(parseMoney(form.purchasePrice))}</p>
               )}
+              <FieldError id="pf-purchasePrice" message={fieldErrors.purchasePrice} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Precio Venta</label>
+              <label htmlFor="pf-salePrice" className="block text-sm font-medium text-gray-700 mb-1.5">Precio Venta *</label>
               <MoneyInput
+                id="pf-salePrice"
                 value={form.salePrice}
-                onChange={(v) => setForm({ ...form, salePrice: v })}
+                aria-invalid={!!fieldErrors.salePrice}
+                aria-describedby={fieldErrors.salePrice ? 'pf-salePrice-error' : undefined}
+                onChange={(v) => { clearFieldError('salePrice'); setForm({ ...form, salePrice: v }) }}
               />
               {vesOf(parseMoney(form.salePrice)) && (
                 <p className="text-xs text-gray-400 mt-1 tabular-nums">= {vesOf(parseMoney(form.salePrice))}</p>
               )}
+              <FieldError id="pf-salePrice" message={fieldErrors.salePrice} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label htmlFor="pf-stock" className="block text-sm font-medium text-gray-700 mb-1.5">
                 Stock {form.sizes.length > 0 && <span className="text-xs text-gray-400 font-normal">(auto desde tallas)</span>}
               </label>
               <input
+                id="pf-stock"
                 type="number"
                 min={0}
                 value={form.stock}
                 readOnly={form.sizes.length > 0}
-                onChange={(e) => { if (form.sizes.length === 0) setForm({ ...form, stock: Number(e.target.value) }) }}
+                aria-invalid={!!fieldErrors.stock}
+                aria-describedby={fieldErrors.stock ? 'pf-stock-error' : undefined}
+                onChange={(e) => { if (form.sizes.length === 0) { clearFieldError('stock'); setForm({ ...form, stock: Number(e.target.value) }) } }}
                 className={`w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all ${form.sizes.length > 0 ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
               />
+              <FieldError id="pf-stock" message={fieldErrors.stock} />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
+              <label htmlFor="pf-minStock" className="block text-sm font-medium text-gray-700 mb-1.5">
                 Stock mínimo
               </label>
               <input
+                id="pf-minStock"
                 type="number"
                 min={0}
                 value={form.minStock}
-                onChange={(e) => setForm({ ...form, minStock: Number(e.target.value) })}
+                aria-invalid={!!fieldErrors.minStock}
+                aria-describedby={fieldErrors.minStock ? 'pf-minStock-error' : undefined}
+                onChange={(e) => { clearFieldError('minStock'); setForm({ ...form, minStock: Number(e.target.value) }) }}
                 className="w-full border border-gray-200 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent text-sm transition-all"
               />
+              <FieldError id="pf-minStock" message={fieldErrors.minStock} />
               <p className="text-xs text-gray-400 mt-1">
                 0 = sin alertas de stock bajo
               </p>
@@ -716,7 +858,8 @@ export default function Products() {
             <button
               type="button"
               onClick={() => setIsModalOpen(false)}
-              className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors"
+              disabled={submitting}
+              className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-xl hover:bg-gray-200 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
               Cancelar
             </button>

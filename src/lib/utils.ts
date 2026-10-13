@@ -93,6 +93,18 @@ export function parseMoney(value: string): number {
   return Number.isFinite(n) && n > 0 ? n : 0
 }
 
+/** Extrae el mensaje legible de un error de Axios (o devuelve el fallback). */
+export function getApiErrorMessage(err: unknown, fallback: string): string {
+  const e = err as { response?: { data?: { message?: unknown } }; code?: unknown }
+  const message = e?.response?.data?.message
+  if (Array.isArray(message)) return message.join(', ') || fallback
+  if (typeof message === 'string' && message.trim()) return message
+  // Sin cuerpo útil (red caída, timeout): el mensaje técnico no le sirve al usuario.
+  if (typeof e?.code === 'string') return fallback
+  if (err instanceof Error && err.message.trim()) return err.message
+  return fallback
+}
+
 /**
  * % de IVA en formato decimal (0-1) según la configuración de la empresa
  * (Settings → % IVA). Fuera de sesión o sin configurar: 19%.

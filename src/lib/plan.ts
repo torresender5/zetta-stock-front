@@ -25,7 +25,7 @@ export function formatSubscriptionEnd(sub: SubscriptionLike | null | undefined):
 }
 
 export const PAYMENT_INSTRUCTIONS = [
-  'Realiza el pago por transferencia bancaria o Nequi a la cuenta de ZettaStock que te indique soporte (soporte@zettastock.com).',
-  'Guarda el comprobante de tu pago.',
-  'Comparte el comprobante con soporte (soporte@zettastock.com) o espera la confirmación: el plan se activará automáticamente.',
+  'Realiza el pago por pago móvil o transferencia bancaria a la cuenta de ZettaStock que aparece en esta página.',
+  'El monto exacto en Bs que debes pagar está indicado junto a la orden de pago.',
+  'Guarda el comprobante de tu pago y súbelo desde esta página: el plan se activará automáticamente cuando el pago sea validado.',
 ] as const

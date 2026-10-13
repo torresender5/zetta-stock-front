@@ -1,9 +1,11 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   BarChart3,
+  Bell,
   BellRing,
   Building2,
   CreditCard,
+  Landmark,
   LayoutDashboard,
   LifeBuoy,
   ListOrdered,
@@ -13,6 +15,8 @@ import {
 } from 'lucide-react'
 import { useAuthStore } from '../stores/authStore'
 import { clearAdminSession } from '../lib/adminAuth'
+import { NotificationsDropdown } from './NotificationsDropdown'
+import { adminNotificationRoute } from '../lib/notifications'
 
 const links = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -20,11 +24,26 @@ const links = [
   { to: '/admin/usuarios', label: 'Usuarios', icon: Users },
   { to: '/admin/planes', label: 'Planes', icon: CreditCard },
   { to: '/admin/ordenes', label: 'Órdenes de pago', icon: ListOrdered },
+  { to: '/admin/configuracion-pagos', label: 'Cuenta de pago', icon: Landmark },
   { to: '/admin/suscripciones', label: 'Suscripciones', icon: ShieldAlert },
   { to: '/admin/negocio', label: 'Negocio', icon: BarChart3 },
   { to: '/admin/tickets', label: 'Tickets', icon: LifeBuoy },
   { to: '/admin/notificaciones', label: 'Notificaciones', icon: BellRing },
 ]
+
+function AdminBell({ className }: { className?: string }) {
+  return (
+    <NotificationsDropdown
+      scope="general"
+      icon={Bell}
+      label="Notificaciones"
+      linkTo="/admin/notificaciones"
+      emptyText="Sin notificaciones"
+      resolveRoute={adminNotificationRoute}
+      buttonClassName={className}
+    />
+  )
+}
 
 export default function AdminLayout() {
   const logout = useAuthStore((s) => s.logout)
@@ -46,6 +65,9 @@ export default function AdminLayout() {
           <div>
             <p className="font-bold text-sm leading-tight">ZettaStock</p>
             <p className="text-xs text-gray-400">Admin</p>
+          </div>
+          <div className="ml-auto">
+            <AdminBell className="text-gray-400 hover:text-white hover:bg-white/10" />
           </div>
         </div>
         <nav className="flex-1 px-3 py-2 space-y-1">
@@ -93,6 +115,7 @@ export default function AdminLayout() {
               {label}
             </NavLink>
           ))}
+          <AdminBell className="text-gray-400 hover:text-white hover:bg-white/10 ml-auto" />
           <button
             onClick={handleLogout}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-gray-400 whitespace-nowrap cursor-pointer"

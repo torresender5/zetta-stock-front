@@ -1,6 +1,12 @@
 import { create } from 'zustand'
 import { subscriptionService } from '../services/subscriptionService'
-import type { PaymentMethods, PaymentOrder, Plan, Subscription } from '../types'
+import type {
+  PaymentDetails,
+  PaymentMethods,
+  PaymentOrder,
+  Plan,
+  Subscription,
+} from '../types'
 
 interface SubscriptionStore {
   subscription: Subscription | null
@@ -15,6 +21,7 @@ interface SubscriptionStore {
     period: 'monthly' | 'yearly',
     provider?: 'stripe' | 'pabilo' | 'manual',
     acceptedTerms?: boolean,
+    fxRate?: number,
   ) => Promise<{
     ok: boolean
     error?: string
@@ -23,6 +30,8 @@ interface SubscriptionStore {
   }>
   paymentMethods: PaymentMethods | null
   fetchPaymentMethods: () => Promise<void>
+  paymentDetails: PaymentDetails | null
+  fetchPaymentDetails: () => Promise<void>
   resetSession: () => void
 }
 
@@ -33,6 +42,7 @@ export const useSubscriptionStore = create<SubscriptionStore>()((set, get) => ({
   loading: false,
   error: null,
   paymentMethods: null,
+  paymentDetails: null,
 
   fetchMySubscription: async () => {
     set({ loading: true, error: null })
@@ -64,7 +74,7 @@ export const useSubscriptionStore = create<SubscriptionStore>()((set, get) => ({
     }
   },
 
-  purchase: async (planId, period, provider, acceptedTerms) => {
+  purchase: async (planId, period, provider, acceptedTerms, fxRate) => {
     set({ loading: true, error: null })
     try {
       const result = await subscriptionService.purchase(
@@ -72,6 +82,7 @@ export const useSubscriptionStore = create<SubscriptionStore>()((set, get) => ({
         period,
         provider,
         acceptedTerms,
+        fxRate,
       )
       set({ loading: false })
       if (!result.order?.checkoutUrl) {
@@ -103,6 +114,16 @@ export const useSubscriptionStore = create<SubscriptionStore>()((set, get) => ({
     }
   },
 
+  fetchPaymentDetails: async () => {
+    try {
+      const details = await subscriptionService.getPaymentDetails()
+      set({ paymentDetails: details })
+    } catch {
+      // sin configuración de cuenta: el checkout mostrará un aviso
+      set({ paymentDetails: null })
+    }
+  },
+
   resetSession: () =>
     set({
       subscription: null,
@@ -110,5 +131,6 @@ export const useSubscriptionStore = create<SubscriptionStore>()((set, get) => ({
       loading: false,
       error: null,
       paymentMethods: null,
+      paymentDetails: null,
     }),
 }))

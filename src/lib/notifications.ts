@@ -1,11 +1,13 @@
 import {
   BadgeAlert,
+  BadgeCheck,
   Bell,
   CalendarClock,
   LifeBuoy,
   Megaphone,
   PackageMinus,
   Wallet,
+  XCircle,
 } from 'lucide-react'
 import type { AppNotification, NotificationType } from '../types'
 
@@ -22,6 +24,9 @@ export const TYPE_ICONS: Record<NotificationType, typeof Bell> = {
   cash_open: Wallet,
   ticket_reply: LifeBuoy,
   announcement: Megaphone,
+  payment_verified: BadgeCheck,
+  payment_rejected: XCircle,
+  payment_review: Bell,
 }
 
 export const TYPE_ROUTES: Partial<Record<NotificationType, string>> = {
@@ -31,6 +36,9 @@ export const TYPE_ROUTES: Partial<Record<NotificationType, string>> = {
   subscription_expired: '/suscripcion',
   cash_open: '/caja',
   ticket_reply: '/tickets',
+  payment_verified: '/suscripcion',
+  payment_rejected: '/suscripcion',
+  payment_review: '/suscripcion',
 }
 
 export const TYPE_LABELS: Record<NotificationType, string> = {
@@ -41,6 +49,19 @@ export const TYPE_LABELS: Record<NotificationType, string> = {
   cash_open: 'Caja',
   ticket_reply: 'Ticket',
   announcement: 'Anuncio',
+  payment_verified: 'Pago',
+  payment_rejected: 'Pago',
+  payment_review: 'Pago',
+}
+
+const PAYMENT_TYPES: ReadonlySet<NotificationType> = new Set([
+  'payment_verified',
+  'payment_rejected',
+  'payment_review',
+])
+
+export function isPaymentNotification(notification: AppNotification): boolean {
+  return PAYMENT_TYPES.has(notification.type)
 }
 
 /** Destino al pulsar la notificación; `null` cuando no hay página asociada. */
@@ -51,4 +72,12 @@ export function notificationRoute(notification: AppNotification): string | null 
   }
   if (notification.type === 'announcement') return null
   return TYPE_ROUTES[notification.type] ?? '/'
+}
+
+/** Destino dentro del panel del superadmin. */
+export function adminNotificationRoute(notification: AppNotification): string | null {
+  if (isPaymentNotification(notification)) return '/admin/ordenes'
+  if (notification.type === 'ticket_reply') return '/admin/tickets'
+  if (notification.type === 'announcement') return '/admin/notificaciones'
+  return null
 }

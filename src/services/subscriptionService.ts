@@ -1,8 +1,11 @@
 import api from '../lib/api'
 import type {
   MySubscriptionResponse,
+  PaymentDetails,
   PaymentMethods,
   PaymentOrder,
+  PaymentProofPayload,
+  PaymentVerificationResult,
   Plan,
   Subscription,
 } from '../types'
@@ -28,12 +31,14 @@ export const subscriptionService = {
     period: 'monthly' | 'yearly',
     provider?: 'stripe' | 'pabilo' | 'manual',
     acceptedTerms?: boolean,
+    fxRate?: number,
   ): Promise<PurchaseResult> => {
     const { data } = await api.post<PurchaseResult>('/subscription/purchase', {
       planId,
       period,
       ...(provider ? { provider } : {}),
       ...(acceptedTerms !== undefined ? { acceptedTerms } : {}),
+      ...(fxRate ? { fxRate } : {}),
     })
     return data
   },
@@ -43,7 +48,57 @@ export const subscriptionService = {
     return data
   },
 
+  getPaymentDetails: async (): Promise<PaymentDetails> => {
+    const { data } = await api.get<PaymentDetails>('/subscription/payment-details')
+    return data
+  },
+
+  submitPaymentProof: async (
+    orderId: number,
+    payload: PaymentProofPayload,
+    file: File,
+  ): Promise<PaymentVerificationResult> => {
+    const form = new FormData()
+    form.append('image', file)
+    form.append('bankReference', payload.bankReference)
+    form.append('paymentMethod', payload.paymentMethod)
+    if (payload.paymentDate) form.append('paymentDate', payload.paymentDate)
+    if (payload.payerDni) form.append('payerDni', payload.payerDni)
+    if (payload.payerPhone) form.append('payerPhone', payload.payerPhone)
+    if (payload.payerBankCode) form.append('payerBankCode', payload.payerBankCode)
+    const { data } = await api.post<PaymentVerificationResult>(
+      `/subscription/payment-orders/${orderId}/proof`,
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    )
+    return data
+  },
+
+  reverifyPaymentProof: async (
+    orderId: number,
+  ): Promise<PaymentVerificationResult> => {
+    const { data } = await api.post<PaymentVerificationResult>(
+      `/subscription/payment-orders/${orderId}/reverify`,
+    )
+    return data
+  },
+
   // ---------- Superadmin ----------
+  getPaymentSettings: async (): Promise<PaymentDetails> => {
+    const { data } = await api.get<PaymentDetails>('/admin/payment-settings')
+    return data
+  },
+
+  updatePaymentSettings: async (
+    payload: Partial<Record<keyof PaymentDetails, string | null>>,
+  ): Promise<PaymentDetails> => {
+    const { data } = await api.put<PaymentDetails>(
+      '/admin/payment-settings',
+      payload,
+    )
+    return data
+  },
+
   getAllPlans: async (): Promise<Plan[]> => {
     const { data } = await api.get<Plan[]>('/admin/plans')
     return data

@@ -6,9 +6,21 @@ interface MoneyInputProps {
   placeholder?: string
   required?: boolean
   className?: string
+  id?: string
+  'aria-invalid'?: boolean
+  'aria-describedby'?: string
 }
 
-export default function MoneyInput({ value, onChange, placeholder = '0', required, className }: MoneyInputProps) {
+export default function MoneyInput({
+  value,
+  onChange,
+  placeholder = '0',
+  required,
+  className,
+  id,
+  'aria-invalid': ariaInvalid,
+  'aria-describedby': ariaDescribedBy,
+}: MoneyInputProps) {
   return (
     <div className="relative">
       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">$</span>
@@ -16,6 +28,9 @@ export default function MoneyInput({ value, onChange, placeholder = '0', require
         type="text"
         inputMode="decimal"
         required={required}
+        id={id}
+        aria-invalid={ariaInvalid}
+        aria-describedby={ariaDescribedBy}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(sanitizeMoneyInput(e.target.value))}
